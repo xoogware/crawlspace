@@ -65,15 +65,19 @@
           ];
         };
 
-        packages = rec {
-          default = rustPlatform.buildRustPackage {
-            pname = "crawlspace";
-            inherit version;
-            src = ./.;
-            cargoLock.lockFile = ./Cargo.lock;
-          };
-
-          debug = default.overrideAttrs (_: _: {buildType = "debug";});
+        packages = let
+          mkCrawlspace = buildType:
+            rustPlatform.buildRustPackage {
+              pname = "crawlspace";
+              inherit version;
+              src = ./.;
+              cargoLock.lockFile = ./Cargo.lock;
+              inherit buildType;
+              dontStrip = buildType == "debug";
+            };
+        in {
+          default = mkCrawlspace "debug";
+          release = mkCrawlspace "release";
         };
       };
     };

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Andrew Brower. 
+ * Copyright (c) 2024 Andrew Brower.
  * This file is part of Crawlspace.
  *
  * Crawlspace is free software: you can redistribute it and/or
@@ -17,6 +17,67 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-fn main() {
-    println!("Hello, world!");
+use std::sync::Arc;
+
+use color_eyre::eyre::Result;
+use server::{player::Player, Server};
+use tokio::net::TcpListener;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+#[macro_use]
+extern crate tracing;
+
+mod protocol;
+mod server;
+
+const TICK_RATE: u8 = 20;
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
+    color_eyre::install()?;
+
+    // RUST_LOG=crawlspace=trace
+    match cfg!(debug_assertions) {
+        true => {
+            let filter = EnvFilter::from_default_env();
+            let fmt = tracing_subscriber::fmt::layer().pretty();
+            tracing_subscriber::registry().with(filter).with(fmt).init();
+        }
+        false => tracing_subscriber::fmt::init(),
+    }
+
+    let port = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(25565);
+
+    let listener = TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+
+    let server = Arc::new(Server::new(TICK_RATE));
+
+    {
+        let mut ticker = server.clone().ticker;
+        tokio::spawn(async move { ticker.run(&server).await });
+    }
+
+    warn!("Listening on port {port}.");
+
+    let mut client_counter: u16 = 0;
+    loop {
+        let (connection, address) = listener.accept().await?;
+
+        let client_id = client_counter;
+        client_counter = client_counter.wrapping_add(1);
+
+        info!("New connection (id {client_id}) from {address}");
+
+        if let Err(why) = connection.set_nodelay(true) {
+            warn!("Failed to set nodelay for {client_id}: {why}");
+        }
+
+        let mut player = Player::new(client_id, connection);
+        tokio::spawn(async move {
+            player.run().await;
+        });
+    }
 }

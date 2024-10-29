@@ -22,3 +22,11 @@ edition = "2021"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
+color-eyre = "0.6.3"
+parking_lot = "0.12.3"
+serde = "1.0.213"
+thiserror = "1.0.65"
+tokio = { version = "1.41.0", features = ["full"] }
+tracing = { version = "0.1.40", features = ["max_level_trace", "release_max_level_warn"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+uuid = "1.11.0"
