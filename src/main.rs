@@ -66,5 +66,8 @@ async fn main() -> Result<()> {
         tokio::spawn(async move { ticker.run(&server).await });
     }
 
+    // TODO: more graceful shutdown?
+    tokio::signal::ctrl_c().await?;
+
     Ok(())
 }
