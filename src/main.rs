@@ -20,17 +20,21 @@
 use std::sync::Arc;
 
 use color_eyre::eyre::Result;
-use server::{player::Player, Server};
-use tokio::net::TcpListener;
+use server::Server;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[macro_use]
 extern crate tracing;
 
+mod net;
 mod protocol;
 mod server;
+mod state;
 
+const MAX_PLAYERS: usize = 500;
 const TICK_RATE: u8 = 20;
+
+struct CrawlState(Arc<state::State>);
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
@@ -46,12 +50,14 @@ async fn main() -> Result<()> {
         false => tracing_subscriber::fmt::init(),
     }
 
+    let state = CrawlState(Arc::new(state::State::new(MAX_PLAYERS)));
+
     let port = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse::<u16>().ok())
         .unwrap_or(25565);
 
-    let listener = TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+    net::spawn_net_handler(state, port).await?;
 
     let server = Arc::new(Server::new(TICK_RATE));
 
@@ -60,24 +66,5 @@ async fn main() -> Result<()> {
         tokio::spawn(async move { ticker.run(&server).await });
     }
 
-    warn!("Listening on port {port}.");
-
-    let mut client_counter: u16 = 0;
-    loop {
-        let (connection, address) = listener.accept().await?;
-
-        let client_id = client_counter;
-        client_counter = client_counter.wrapping_add(1);
-
-        info!("New connection (id {client_id}) from {address}");
-
-        if let Err(why) = connection.set_nodelay(true) {
-            warn!("Failed to set nodelay for {client_id}: {why}");
-        }
-
-        let mut player = Player::new(client_id, connection);
-        tokio::spawn(async move {
-            player.run().await;
-        });
-    }
+    Ok(())
 }
