@@ -18,9 +18,14 @@
  */
 
 use color_eyre::eyre::Result;
+use player::Player;
 use tokio::net::TcpListener;
+use uuid::Uuid;
 
-use crate::{server::player::Player, CrawlState};
+mod io;
+mod player;
+
+use crate::CrawlState;
 
 pub async fn spawn_net_handler(state: CrawlState, port: u16) -> Result<()> {
     let listener = TcpListener::bind(format!("0.0.0.0:{port}")).await?;
@@ -46,18 +51,12 @@ async fn net_handler(state: CrawlState, listener: TcpListener) {
                     let client_id = client_counter;
                     client_counter = client_counter.wrapping_add(1);
 
-                    info!("New connection (id {client_id}) from {addy}");
-
-                    if let Err(why) = conn.set_nodelay(true) {
-                        warn!("Failed to set nodelay for {client_id}: {why}");
-                    }
-
                     tokio::spawn(async move {
                         // TODO: handle initial connection here! DO NOT DROP PERMIT UNTIL PLAYER
                         // DISCONNECTS
-                        let mut player = Player::new(client_id, conn);
                         tokio::spawn(async move {
-                            player.run().await;
+                            let mut player = Player::new(client_id, conn);
+                            player.connect().await;
                         });
 
                         // moves permit to this closure so it must be dropped by the spawned task

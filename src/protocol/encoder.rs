@@ -16,37 +16,3 @@
  * License along with Crawlspace. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-
-pub mod ticker;
-
-mod world;
-
-use std::sync::Arc;
-
-use parking_lot::Mutex;
-use world::World;
-
-use self::ticker::Ticker;
-
-pub struct Server {
-    pub ticker: Ticker,
-
-    world: Option<Arc<World>>,
-    players: Arc<Mutex<Vec<uuid::Uuid>>>,
-}
-
-impl Server {
-    #[must_use]
-    pub fn new(tick_rate: u8) -> Self {
-        Server {
-            ticker: Ticker::new(tick_rate),
-            world: None,
-            players: Arc::new(Mutex::new(Vec::new())),
-        }
-    }
-
-    async fn tick(&self) {
-        let players = self.players.lock();
-        players.iter().for_each(|p| trace!("Ticking {p}"));
-    }
-}

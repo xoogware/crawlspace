@@ -17,4 +17,96 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-pub mod v47;
+pub mod datatypes {
+    mod string;
+    mod variable;
+
+    pub use string::*;
+    pub use variable::*;
+}
+
+pub mod packets {
+    mod handshake;
+    mod status;
+
+    pub use handshake::*;
+    pub use status::*;
+}
+
+mod decoder;
+mod encoder;
+
+use std::{fmt::Debug, io::Write};
+
+use bytes::BytesMut;
+use color_eyre::eyre::{bail, Context, Result};
+use datatypes::VarInt;
+pub use decoder::*;
+pub use encoder::*;
+use thiserror::Error;
+
+const MAX_PACKET_SIZE: i32 = 2097152;
+
+pub trait Encode {
+    fn encode(&self, w: impl Write) -> Result<()>;
+}
+
+pub trait Decode<'a>: Sized {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>;
+}
+
+pub enum PacketDirection {
+    Clientbound,
+    Serverbound,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum PacketState {
+    Handshaking,
+    Play,
+    Status,
+    Login,
+    Transfer,
+}
+
+#[derive(Error, Debug)]
+pub enum PacketStateDecodeError {
+    #[error("Unable to decode {0} into a PacketState")]
+    InvalidState(i32),
+}
+
+impl TryFrom<i32> for PacketState {
+    type Error = PacketStateDecodeError;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(PacketState::Status),
+            2 => Ok(PacketState::Login),
+            3 => Ok(PacketState::Transfer),
+            i => Err(PacketStateDecodeError::InvalidState(i)),
+        }
+    }
+}
+
+trait Packet {
+    const ID: i32;
+}
+
+#[expect(private_bounds)]
+pub trait ServerboundPacket<'a>: Packet + Decode<'a> + Debug {}
+impl<'a, P> ServerboundPacket<'a> for P where P: Packet + Decode<'a> + Debug {}
+
+#[expect(private_bounds)]
+pub trait ClientboundPacket: Packet + Encode + Debug {
+    fn encode_packet(&self, mut w: impl Write) -> Result<()>
+    where
+        Self: Encode,
+    {
+        VarInt(Self::ID)
+            .encode(&mut w)
+            .context("Failed to encode packet id")?;
+
+        self.encode(w)
+    }
+}
+impl<P> ClientboundPacket for P where P: Packet + Encode + Debug {}
