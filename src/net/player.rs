@@ -18,12 +18,16 @@
  */
 
 use color_eyre::eyre::Result;
+use serde_json::json;
 use tokio::net::TcpStream;
 use uuid::Uuid;
 
-use crate::protocol::{
-    packets::{HandshakeS, StatusRequestS},
-    PacketState,
+use crate::{
+    protocol::{
+        packets::{HandshakeS, Ping, StatusRequestS, StatusResponseC},
+        PacketState,
+    },
+    CrawlState,
 };
 
 use super::io::NetIo;
@@ -32,6 +36,8 @@ pub struct Player {
     pub id: u16,
     state: PlayerState,
     io: NetIo,
+
+    crawlstate: CrawlState,
 }
 
 pub enum PlayerState {
@@ -43,11 +49,13 @@ pub enum PlayerState {
 
 impl Player {
     #[must_use]
-    pub fn new(id: u16, connection: TcpStream) -> Self {
+    pub fn new(crawlstate: CrawlState, id: u16, connection: TcpStream) -> Self {
         Self {
             id,
             state: PlayerState::Connecting,
             io: NetIo::new(connection),
+
+            crawlstate,
         }
     }
 
@@ -73,11 +81,6 @@ impl Player {
         let p = self.io.rx::<HandshakeS>().await?;
         let next_state = p.next_state;
 
-        debug!(
-            "Got handshake packet from {}; prococol version {}, next state {:#?}",
-            self.id, p.protocol_version, p.next_state
-        );
-
         match next_state {
             PacketState::Status => {
                 self.handle_status().await?;
@@ -91,7 +94,31 @@ impl Player {
     }
 
     async fn handle_status(&mut self) -> Result<()> {
-        let p = self.io.rx::<StatusRequestS>().await?;
+        self.io.rx::<StatusRequestS>().await?;
+        let state = self.crawlstate.clone();
+
+        let res = json!({
+            "version": {
+                "name": state.version_name
+            },
+            "players": {
+                "online": state.current_players,
+                "max": state.max_players
+            },
+            "description": {
+                "text": state.description
+            },
+            "enforcesSecureChat": false
+        });
+
+        let res = StatusResponseC {
+            json_respose: &res.to_string(),
+        };
+
+        self.io.tx(&res).await?;
+        let ping = self.io.rx::<Ping>().await?;
+        self.io.tx(&ping).await?;
+
         Ok(())
     }
 }

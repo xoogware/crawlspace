@@ -19,14 +19,12 @@
 
 use color_eyre::eyre::{ensure, Result};
 
-use crate::protocol::Decode;
+use crate::protocol::{Decode, Encode};
 
 use super::VarInt;
 
-const MAX_BOUND: usize = 32767;
-
 #[derive(Debug)]
-pub struct BoundedString<'a, const BOUND: usize>(&'a str);
+pub struct BoundedString<'a, const BOUND: usize = 32767>(pub &'a str);
 
 impl<'a, const BOUND: usize> Decode<'a> for BoundedString<'a, BOUND> {
     fn decode(r: &mut &'a [u8]) -> Result<Self> {
@@ -34,10 +32,6 @@ impl<'a, const BOUND: usize> Decode<'a> for BoundedString<'a, BOUND> {
         ensure!(len >= 0, "tried to decode string with negative length");
 
         let len = len as usize;
-        ensure!(
-            len <= MAX_BOUND,
-            "string length greater than MAX_BOUND {MAX_BOUND}"
-        );
         ensure!(
             len <= r.len(),
             "malformed packet - not enough data to continue decoding (expected {len} got {})",
@@ -56,5 +50,23 @@ impl<'a, const BOUND: usize> Decode<'a> for BoundedString<'a, BOUND> {
         *r = rest;
 
         Ok(BoundedString(content))
+    }
+}
+
+impl<'a, const BOUND: usize> Encode for BoundedString<'a, BOUND> {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        let len = self.0.encode_utf16().count();
+
+        ensure!(len < BOUND, "length of string {len} exceeds bound {BOUND}");
+
+        VarInt(self.0.len() as i32).encode(&mut w)?;
+        Ok(w.write_all(self.0.as_bytes())?)
+    }
+}
+
+impl Encode for str {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        VarInt(self.len() as i32).encode(&mut w)?;
+        Ok(w.write_all(self.as_bytes())?)
     }
 }

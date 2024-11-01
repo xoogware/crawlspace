@@ -34,8 +34,8 @@ pub async fn spawn_net_handler(state: CrawlState, port: u16) -> Result<()> {
     Ok(())
 }
 
-async fn net_handler(state: CrawlState, listener: TcpListener) {
-    let state = state.0.clone();
+async fn net_handler(crawlstate: CrawlState, listener: TcpListener) {
+    let state = crawlstate.clone();
     let mut client_counter: u16 = 0;
     loop {
         // it feels weird to clone on each loop here but that's what it says to do so i guess it's
@@ -50,12 +50,13 @@ async fn net_handler(state: CrawlState, listener: TcpListener) {
                 Ok((conn, addy)) => {
                     let client_id = client_counter;
                     client_counter = client_counter.wrapping_add(1);
+                    let state = crawlstate.clone();
 
                     tokio::spawn(async move {
                         // TODO: handle initial connection here! DO NOT DROP PERMIT UNTIL PLAYER
                         // DISCONNECTS
                         tokio::spawn(async move {
-                            let mut player = Player::new(client_id, conn);
+                            let mut player = Player::new(state, client_id, conn);
                             player.connect().await;
                         });
 

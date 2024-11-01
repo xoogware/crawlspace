@@ -19,8 +19,8 @@
 
 use std::io::Write;
 
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use color_eyre::eyre::Result;
-use serde::Serialize;
 
 use crate::protocol::{Decode, Encode, Packet};
 
@@ -39,56 +39,38 @@ impl<'a> Decode<'a> for StatusRequestS {
 
 #[derive(Debug)]
 pub struct StatusResponseC<'a> {
-    json_respose: StatusJSON<'a>,
+    pub json_respose: &'a str,
 }
 
-#[derive(Debug, Serialize)]
-struct StatusJSON<'a> {
-    version: Version<'a>,
-    players: Players,
-    description: Option<Description<'a>>,
-    enforces_secure_chat: bool,
+impl<'a> Packet for StatusResponseC<'a> {
+    const ID: i32 = 0x00;
 }
 
-#[derive(Debug, Serialize)]
-struct Version<'a> {
-    name: &'a str,
-}
-
-#[derive(Debug, Serialize)]
-struct Players {
-    max: i32,
-    online: i32,
-}
-
-#[derive(Debug, Serialize)]
-struct Description<'a> {
-    text: &'a str,
-}
-
-impl<'a> StatusResponseC<'a> {
-    pub fn new(
-        version_name: &'a str,
-        online_players: i32,
-        max_players: i32,
-        description: Option<&'a str>,
-    ) -> Self {
-        Self {
-            json_respose: StatusJSON {
-                version: Version { name: version_name },
-                players: Players {
-                    online: online_players,
-                    max: max_players,
-                },
-                description: description.map(|t| Description { text: t }),
-                enforces_secure_chat: false,
-            },
-        }
+impl<'a> Encode for StatusResponseC<'a> {
+    fn encode(&self, mut w: impl Write) -> Result<()> {
+        Ok(self.json_respose.encode(&mut w)?)
     }
 }
 
-impl Encode for StatusResponseC {
-    fn encode(&self, w: impl Write) -> Result<()> {
-        Ok(())
+#[derive(Debug)]
+pub struct Ping {
+    payload: i64,
+}
+
+impl Packet for Ping {
+    const ID: i32 = 0x01;
+}
+
+impl<'a> Decode<'a> for Ping {
+    fn decode(buf: &mut &'a [u8]) -> Result<Self> {
+        Ok(Self {
+            payload: buf.read_i64::<BigEndian>()?,
+        })
+    }
+}
+
+impl Encode for Ping {
+    fn encode(&self, mut w: impl Write) -> Result<()> {
+        Ok(w.write_i64::<BigEndian>(self.payload)?)
     }
 }

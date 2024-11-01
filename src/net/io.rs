@@ -21,14 +21,18 @@ use std::{io::ErrorKind, net::SocketAddr};
 
 use bytes::BytesMut;
 use color_eyre::eyre::Result;
-use tokio::{io::AsyncReadExt, net::TcpStream};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
 
-use crate::protocol::{self, Decode, Frame, ServerboundPacket};
+use crate::protocol::{self, ClientboundPacket, Decode, Frame, ServerboundPacket};
 
 pub struct NetIo {
     stream: TcpStream,
     frame: Frame,
     decoder: protocol::Decoder,
+    encoder: protocol::Encoder,
 }
 
 const BUF_SIZE: usize = 4096;
@@ -52,6 +56,7 @@ impl NetIo {
                 body: BytesMut::new(),
             },
             decoder: protocol::Decoder::new(),
+            encoder: protocol::Encoder::new(),
         }
     }
 
@@ -80,5 +85,14 @@ impl NetIo {
 
             self.decoder.add_bytes(buf);
         }
+    }
+
+    pub async fn tx<P>(&mut self, packet: &P) -> Result<()>
+    where
+        P: ClientboundPacket,
+    {
+        self.encoder.append_packet(packet)?;
+        let bytes = self.encoder.take();
+        Ok(self.stream.write_all(&bytes).await?)
     }
 }

@@ -31,10 +31,12 @@ mod protocol;
 mod server;
 mod state;
 
-const MAX_PLAYERS: usize = 500;
+const VERSION: &str = "1.21.1";
+const DESCRIPTION: &str = "sheldon cooper residence";
+const MAX_PLAYERS: usize = 906;
 const TICK_RATE: u8 = 20;
 
-struct CrawlState(Arc<state::State>);
+type CrawlState = Arc<state::State>;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
@@ -50,7 +52,7 @@ async fn main() -> Result<()> {
         false => tracing_subscriber::fmt::init(),
     }
 
-    let state = CrawlState(Arc::new(state::State::new(MAX_PLAYERS)));
+    let state = Arc::new(state::State::new(VERSION, DESCRIPTION, MAX_PLAYERS));
 
     let port = std::env::var("PORT")
         .ok()
