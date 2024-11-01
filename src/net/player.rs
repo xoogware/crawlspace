@@ -34,17 +34,9 @@ use super::io::NetIo;
 
 pub struct Player {
     pub id: u16,
-    state: PlayerState,
     io: NetIo,
 
     crawlstate: CrawlState,
-}
-
-pub enum PlayerState {
-    Connecting,
-    Playing(Uuid),
-    Broken,
-    Closed,
 }
 
 impl Player {
@@ -52,7 +44,6 @@ impl Player {
     pub fn new(crawlstate: CrawlState, id: u16, connection: TcpStream) -> Self {
         Self {
             id,
-            state: PlayerState::Connecting,
             io: NetIo::new(connection),
 
             crawlstate,
@@ -85,9 +76,8 @@ impl Player {
             PacketState::Status => {
                 self.handle_status().await?;
             }
-            s => {
-                unimplemented!("state {:#?} unimplemented after handshake", s);
-            }
+            PacketState::Login => {}
+            s => unimplemented!("state {:#?} unimplemented after handshake", s),
         }
 
         Ok(())
@@ -99,7 +89,8 @@ impl Player {
 
         let res = json!({
             "version": {
-                "name": state.version_name
+                "name": state.version_name,
+                "protocol": state.version_number,
             },
             "players": {
                 "online": state.current_players,

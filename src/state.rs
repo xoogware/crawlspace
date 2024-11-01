@@ -26,13 +26,19 @@ pub struct State {
     pub current_players: AtomicUsize,
     pub description: String,
     pub version_name: String,
+    pub version_number: i32,
 
     pub net_sema: Arc<Semaphore>,
 }
 
 impl State {
     #[must_use]
-    pub fn new(version_name: &str, description: &str, max_players: usize) -> Self {
+    pub fn new(
+        version_name: &str,
+        version_number: i32,
+        description: &str,
+        max_players: usize,
+    ) -> Self {
         let max = max_players.min(Semaphore::MAX_PERMITS);
 
         if max < max_players {
@@ -44,6 +50,7 @@ impl State {
             current_players: AtomicUsize::new(0),
             description: description.to_owned(),
             version_name: version_name.to_owned(),
+            version_number: version_number.to_owned(),
             net_sema: Arc::new(Semaphore::new(max)),
         }
     }

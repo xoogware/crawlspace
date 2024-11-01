@@ -32,6 +32,7 @@ mod server;
 mod state;
 
 const VERSION: &str = "1.21.1";
+const VERSION_NUM: i32 = 767;
 const DESCRIPTION: &str = "sheldon cooper residence";
 const MAX_PLAYERS: usize = 906;
 const TICK_RATE: u8 = 20;
@@ -52,7 +53,12 @@ async fn main() -> Result<()> {
         false => tracing_subscriber::fmt::init(),
     }
 
-    let state = Arc::new(state::State::new(VERSION, DESCRIPTION, MAX_PLAYERS));
+    let state = Arc::new(state::State::new(
+        VERSION,
+        VERSION_NUM,
+        DESCRIPTION,
+        MAX_PLAYERS,
+    ));
 
     let port = std::env::var("PORT")
         .ok()
