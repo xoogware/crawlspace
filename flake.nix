@@ -74,6 +74,7 @@
               cargoLock.lockFile = ./Cargo.lock;
               inherit buildType;
               dontStrip = buildType == "debug";
+              buildInputs = with pkgs; [pkg-config openssl];
             };
         in {
           default = mkCrawlspace "debug";
