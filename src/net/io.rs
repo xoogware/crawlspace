@@ -17,10 +17,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::{io::ErrorKind, net::SocketAddr};
+use std::{io::ErrorKind, net::SocketAddr, time::Duration};
 
 use bytes::BytesMut;
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{Context, Result};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -64,33 +64,58 @@ impl NetIo {
         Ok(self.stream.peer_addr()?)
     }
 
-    pub async fn rx<'a, P>(&'a mut self) -> Result<P>
+    pub async fn rx<'a, 'b, P>(&'a mut self) -> Result<P>
     where
         P: ServerboundPacket<'a>,
     {
-        loop {
-            if let Some(frame) = self.decoder.try_read_next()? {
-                self.frame = frame;
-                let r = self.frame.decode();
-                debug!("Got packet {:#?}", r);
-                return r;
-            };
+        // TODO: maybe move this somewhere else? i don't know if a global timeout of 5 seconds per
+        // packet is realistic but for testing it's chill i suppose
+        tokio::time::timeout(Duration::from_secs(5), async move {
+            loop {
+                if let Some(frame) = self
+                    .decoder
+                    .try_read_next()
+                    .context("failed try_read_next")?
+                {
+                    if frame.id != P::ID {
+                        debug!(
+                            "Got packet ID {} while awaiting {}, discarding",
+                            frame.id,
+                            P::ID
+                        );
+                        continue;
+                    }
 
-            self.decoder.reserve_additional(BUF_SIZE);
-            let mut buf = self.decoder.take_all();
+                    self.frame = frame;
+                    let r = self.frame.decode()?;
+                    debug!("Got packet {:#?}", r);
+                    return Ok(r);
+                };
 
-            if self.stream.read_buf(&mut buf).await? == 0 {
-                return Err(std::io::Error::from(ErrorKind::UnexpectedEof).into());
+                self.decoder.reserve_additional(BUF_SIZE);
+                let mut buf = self.decoder.take_all();
+
+                if self
+                    .stream
+                    .read_buf(&mut buf)
+                    .await
+                    .context("failed read_buf")?
+                    == 0
+                {
+                    return Err(std::io::Error::from(ErrorKind::UnexpectedEof).into());
+                }
+
+                self.decoder.add_bytes(buf);
             }
-
-            self.decoder.add_bytes(buf);
-        }
+        })
+        .await?
     }
 
     pub async fn tx<P>(&mut self, packet: &P) -> Result<()>
     where
         P: ClientboundPacket,
     {
+        debug!("Sending packet {:#?}", packet);
         self.encoder.append_packet(packet)?;
         let bytes = self.encoder.take();
         Ok(self.stream.write_all(&bytes).await?)

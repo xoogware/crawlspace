@@ -21,14 +21,14 @@ use byteorder::{BigEndian, ReadBytesExt};
 use color_eyre::eyre::Result;
 
 use crate::protocol::{
-    datatypes::{BoundedString, VarInt},
+    datatypes::{Bounded, VarInt},
     Decode, Packet, PacketState,
 };
 
 #[derive(Debug)]
 pub struct HandshakeS<'a> {
     pub protocol_version: VarInt,
-    _server_address: BoundedString<'a, 255>,
+    _server_address: Bounded<&'a str, 255>,
     _server_port: u16,
     pub next_state: PacketState,
 }
@@ -41,7 +41,7 @@ impl<'a> Decode<'a> for HandshakeS<'a> {
     fn decode(buf: &mut &'a [u8]) -> Result<Self> {
         Ok(Self {
             protocol_version: VarInt::decode(buf)?,
-            _server_address: BoundedString::<255>::decode(buf)?,
+            _server_address: Bounded::<&'a str, 255>::decode(buf)?,
             _server_port: buf.read_u16::<BigEndian>()?,
             next_state: PacketState::try_from(VarInt::decode(buf)?.0)?,
         })

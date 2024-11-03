@@ -21,12 +21,12 @@ use color_eyre::eyre::{ensure, Result};
 
 use crate::protocol::{Decode, Encode};
 
-use super::VarInt;
+use super::{Bytes, VarInt};
 
 #[derive(Debug)]
-pub struct BoundedString<'a, const BOUND: usize = 32767>(pub &'a str);
+pub struct Bounded<T, const BOUND: usize = 32767>(pub T);
 
-impl<'a, const BOUND: usize> Decode<'a> for BoundedString<'a, BOUND> {
+impl<'a, const BOUND: usize> Decode<'a> for Bounded<&'a str, BOUND> {
     fn decode(r: &mut &'a [u8]) -> Result<Self> {
         let len = VarInt::decode(r)?.0;
         ensure!(len >= 0, "tried to decode string with negative length");
@@ -49,11 +49,11 @@ impl<'a, const BOUND: usize> Decode<'a> for BoundedString<'a, BOUND> {
 
         *r = rest;
 
-        Ok(BoundedString(content))
+        Ok(Bounded(content))
     }
 }
 
-impl<'a, const BOUND: usize> Encode for BoundedString<'a, BOUND> {
+impl<'a, const BOUND: usize> Encode for Bounded<&'a str, BOUND> {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         let len = self.0.encode_utf16().count();
 
@@ -68,5 +68,41 @@ impl Encode for str {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         VarInt(self.len() as i32).encode(&mut w)?;
         Ok(w.write_all(self.as_bytes())?)
+    }
+}
+
+impl<'a, const BOUND: usize> Encode for Bounded<Bytes<'a>, BOUND> {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        let len = self.0 .0.len();
+        ensure!(len < BOUND, "length of bytes {len} exceeds bound {BOUND}");
+        VarInt(len as i32).encode(&mut w)?;
+        Ok(self.0.encode(&mut w)?)
+    }
+}
+
+impl<'a, const BOUND: usize> Decode<'a> for Bounded<Bytes<'a>, BOUND> {
+    fn decode(r: &mut &'a [u8]) -> Result<Self> {
+        let len = VarInt::decode(r)?.0;
+        ensure!(len >= 0, "tried to decode string with negative length");
+
+        let len = len as usize;
+        ensure!(
+            len <= r.len(),
+            "malformed packet - not enough data to continue decoding (expected {len} got {})",
+            r.len(),
+        );
+
+        let (mut content, rest) = r.split_at(len);
+        let content = Bytes::decode(&mut content)?;
+        let len = content.0.len();
+
+        ensure!(
+            len <= BOUND,
+            "raw byte length exceeds {BOUND} chars (is {len})"
+        );
+
+        *r = rest;
+
+        Ok(Bounded(content))
     }
 }

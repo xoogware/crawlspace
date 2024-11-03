@@ -17,14 +17,24 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use color_eyre::eyre::Result;
+use std::time::Duration;
+
+use color_eyre::eyre::{bail, Result};
 use serde_json::json;
-use tokio::net::TcpStream;
+use tokio::{
+    net::TcpStream,
+    time::{self, sleep, timeout},
+};
 use uuid::Uuid;
 
 use crate::{
     protocol::{
-        packets::{HandshakeS, Ping, StatusRequestS, StatusResponseC},
+        datatypes::{Bounded, Bytes, Ident, VarInt},
+        packets::{
+            FinishConfigurationAckS, FinishConfigurationC, HandshakeS, KnownPack, KnownPacksC,
+            KnownPacksS, LoginAckS, LoginStartS, LoginSuccessC, Ping, PluginRequestC,
+            StatusRequestS, StatusResponseC,
+        },
         PacketState,
     },
     CrawlState,
@@ -60,11 +70,10 @@ impl Player {
         );
 
         // crawlspace intentionally doesn't support legacy pings :3
-        match self.handshake().await {
-            Ok(()) => (),
-            Err(why) => {
-                error!("Error handshaking: {why}");
-            }
+        match timeout(Duration::from_secs(5), self.handshake()).await {
+            Err(e) => warn!("Timed out waiting for {} to connect: {e}", self.id),
+            Ok(Err(why)) => warn!("Error handshaking: {why}"),
+            Ok(Ok(())) => debug!("Handshake complete for client {}.", self.id),
         }
     }
 
@@ -76,7 +85,9 @@ impl Player {
             PacketState::Status => {
                 self.handle_status().await?;
             }
-            PacketState::Login => {}
+            PacketState::Login => {
+                self.login().await?;
+            }
             s => unimplemented!("state {:#?} unimplemented after handshake", s),
         }
 
@@ -109,6 +120,56 @@ impl Player {
         self.io.tx(&res).await?;
         let ping = self.io.rx::<Ping>().await?;
         self.io.tx(&ping).await?;
+
+        Ok(())
+    }
+
+    async fn login(&mut self) -> Result<()> {
+        let state = self.crawlstate.clone();
+
+        let login = self.io.rx::<LoginStartS>().await?;
+
+        // need to manually clone this or else the reference to self.io lives too long
+        // TODO: clean up lifetimes on encode/decode - possibly just clone strings?
+        let uuid = login.player_uuid;
+        let username = login.name.0.to_owned();
+
+        //self.login_velocity(&username).await?;
+
+        let success = LoginSuccessC {
+            uuid,
+            username: Bounded(&username),
+            properties: Vec::new(),
+            strict_error_handling: false,
+        };
+
+        // TODO: skins
+        #[cfg(feature = "skins")]
+        {}
+
+        self.io.tx(&success).await?;
+        self.io.rx::<LoginAckS>().await?;
+
+        let clientbound_known_packs = KnownPacksC::of_version(&state.version_name);
+        self.io.tx(&clientbound_known_packs).await?;
+
+        // TODO: maybe(?) actually handle this
+        self.io.rx::<KnownPacksS>().await?;
+
+        self.io.tx(&FinishConfigurationC).await?;
+        self.io.rx::<FinishConfigurationAckS>().await?;
+
+        Ok(())
+    }
+
+    async fn login_velocity(&mut self, username: &str) -> Result<()> {
+        let req = PluginRequestC {
+            message_id: VarInt(0),
+            channel: Bounded("velocity:player_info"),
+            data: Bounded(Bytes(&[3])),
+        };
+
+        self.io.tx(&req).await?;
 
         Ok(())
     }

@@ -18,18 +18,26 @@
  */
 
 pub mod datatypes {
+    mod ident;
+    mod impls;
     mod string;
     mod variable;
 
+    pub use ident::*;
+    pub use impls::*;
     pub use string::*;
     pub use variable::*;
 }
 
 pub mod packets {
+    mod config;
     mod handshake;
+    mod login;
     mod status;
 
+    pub use config::*;
     pub use handshake::*;
+    pub use login::*;
     pub use status::*;
 }
 
@@ -38,8 +46,7 @@ mod encoder;
 
 use std::{fmt::Debug, io::Write};
 
-use bytes::BytesMut;
-use color_eyre::eyre::{bail, Context, Result};
+use color_eyre::eyre::{Context, Result};
 use datatypes::VarInt;
 pub use decoder::*;
 pub use encoder::*;
@@ -53,6 +60,10 @@ pub trait Encode {
 
 pub trait Decode<'a>: Sized {
     fn decode(r: &mut &'a [u8]) -> Result<Self>;
+}
+
+pub trait DecodeSized<'a>: Sized {
+    fn decode(times: usize, r: &mut &'a [u8]) -> Result<Self>;
 }
 
 pub enum PacketDirection {
@@ -88,7 +99,7 @@ impl TryFrom<i32> for PacketState {
     }
 }
 
-trait Packet {
+pub trait Packet {
     const ID: i32;
 }
 
