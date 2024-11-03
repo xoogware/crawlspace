@@ -23,32 +23,42 @@ mod world;
 
 use std::sync::Arc;
 
-use parking_lot::Mutex;
 use world::World;
 
-use crate::net::player::Player;
+use crate::{net::player::Player, CrawlState};
 
 use self::ticker::Ticker;
 
+#[derive(Debug)]
 pub struct Server {
     pub ticker: Ticker,
 
     _world: Option<Arc<World>>,
-    players: Arc<Mutex<Vec<Player>>>,
+    players: Vec<Arc<Player>>,
+
+    crawlstate: CrawlState,
 }
 
 impl Server {
     #[must_use]
-    pub fn new(tick_rate: u8) -> Self {
+    pub fn new(state: CrawlState, tick_rate: u8) -> Self {
         Server {
             ticker: Ticker::new(tick_rate),
             _world: None,
-            players: Arc::new(Mutex::new(Vec::new())),
+            players: Vec::new(),
+            crawlstate: state,
         }
     }
 
-    async fn tick(&self) {
-        let players = self.players.lock();
-        players.iter().for_each(|p| trace!("Ticking {}", p.id));
+    #[tracing::instrument]
+    async fn tick(&mut self) {
+        let state = self.crawlstate.clone();
+        let mut player_recv = state.player_recv.lock().await;
+
+        while let Ok(p) = player_recv.try_recv() {
+            self.players.push(p);
+        }
+
+        self.players.iter().for_each(|p| trace!("Ticking {}", p.id));
     }
 }

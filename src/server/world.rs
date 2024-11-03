@@ -17,6 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+#[derive(Debug)]
 pub struct World {}
 
 impl World {

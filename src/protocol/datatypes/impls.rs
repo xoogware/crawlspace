@@ -46,6 +46,36 @@ impl Encode for bool {
     }
 }
 
+impl Encode for i8 {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        Ok(w.write_i8(*self)?)
+    }
+}
+
+impl Encode for u8 {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        Ok(w.write_u8(*self)?)
+    }
+}
+
+impl Encode for i32 {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        Ok(w.write_i32::<BigEndian>(*self)?)
+    }
+}
+
+impl Encode for i64 {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        Ok(w.write_i64::<BigEndian>(*self)?)
+    }
+}
+
+impl Encode for u64 {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        Ok(w.write_u64::<BigEndian>(*self)?)
+    }
+}
+
 impl Encode for u128 {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         Ok(w.write_u128::<BigEndian>(*self)?)
@@ -70,11 +100,9 @@ where
 {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         match self {
-            None => w.write_all(&[0x00])?,
-            Some(v) => v.encode(&mut w)?,
-        };
-
-        Ok(())
+            None => Ok(()),
+            Some(v) => v.encode(&mut w),
+        }
     }
 }
 

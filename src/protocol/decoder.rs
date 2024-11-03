@@ -30,13 +30,14 @@ use super::{
 #[cfg(feature = "encryption")]
 type _Cipher = cfb8::Decryptor<aes::Aes128>;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Decoder {
     buf: BytesMut,
     #[cfg(feature = "encryption")]
     _compression_threshold: i32,
 }
 
+#[derive(Debug)]
 pub struct Frame {
     pub id: i32,
     pub body: BytesMut,

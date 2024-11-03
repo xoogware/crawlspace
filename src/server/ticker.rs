@@ -21,7 +21,7 @@ use std::time::Duration;
 
 use tokio::time::{sleep, Instant};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Ticker {
     tick_interval: Duration,
     last_tick: Instant,
@@ -36,7 +36,7 @@ impl Ticker {
         }
     }
 
-    pub async fn run(&mut self, server: &super::Server) {
+    pub async fn run(&mut self, mut server: super::Server) {
         loop {
             let now = Instant::now();
             let elapsed = now - self.last_tick;

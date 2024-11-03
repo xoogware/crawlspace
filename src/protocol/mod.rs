@@ -19,24 +19,34 @@
 
 pub mod datatypes {
     mod impls;
+    mod position;
     mod string;
     mod variable;
 
     pub use impls::*;
+    pub use position::*;
     pub use string::*;
     pub use variable::*;
 }
 
 pub mod packets {
-    mod config;
-    mod handshake;
-    mod login;
-    mod status;
+    pub mod login {
+        mod config;
+        mod handshake;
+        mod login;
+        mod status;
 
-    pub use config::*;
-    pub use handshake::*;
-    pub use login::*;
-    pub use status::*;
+        pub use config::*;
+        pub use handshake::*;
+        pub use login::*;
+        pub use status::*;
+    }
+
+    pub mod play {
+        mod login;
+
+        pub use login::*;
+    }
 }
 
 mod decoder;
@@ -66,8 +76,8 @@ pub trait DecodeSized<'a>: Sized {
 
 #[derive(Clone, Copy, Debug)]
 pub enum PacketState {
-    _Handshaking,
-    _Play,
+    Handshaking,
+    Play,
     Status,
     Login,
     Transfer,

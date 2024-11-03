@@ -65,13 +65,13 @@ async fn main() -> Result<()> {
         .and_then(|p| p.parse::<u16>().ok())
         .unwrap_or(25565);
 
-    net::spawn_net_handler(state, port).await?;
+    net::spawn_net_handler(state.clone(), port).await?;
 
-    let server = Arc::new(Server::new(TICK_RATE));
+    let server = Server::new(state.clone(), TICK_RATE);
 
     {
-        let mut ticker = server.clone().ticker;
-        tokio::spawn(async move { ticker.run(&server).await });
+        let mut ticker = server.ticker;
+        tokio::spawn(async move { ticker.run(server).await });
     }
 
     // TODO: more graceful shutdown?

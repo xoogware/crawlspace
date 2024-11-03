@@ -55,12 +55,9 @@ async fn net_handler(crawlstate: CrawlState, listener: TcpListener) {
                         // TODO: handle initial connection here! DO NOT DROP PERMIT UNTIL PLAYER
                         // DISCONNECTS
                         tokio::spawn(async move {
-                            let mut player = Player::new(state, client_id, conn);
+                            let mut player = Player::new(state, permit, client_id, conn);
                             player.connect().await;
                         });
-
-                        // moves permit to this closure so it must be dropped by the spawned task
-                        std::mem::drop(permit);
                     });
                 }
             },

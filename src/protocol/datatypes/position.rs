@@ -1,0 +1,86 @@
+/*
+ * Copyright (c) 2024 Andrew Brower.
+ * This file is part of Crawlspace.
+ *
+ * Crawlspace is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Affero General Public
+ * License as published by the Free Software Foundation, either
+ * version 3 of the License, or (at your option) any later version.
+ *
+ * Crawlspace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public
+ * License along with Crawlspace. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+use std::error::Error;
+
+use bitfield_struct::bitfield;
+use byteorder::{BigEndian, WriteBytesExt};
+use color_eyre::eyre::{bail, Result};
+use thiserror::Error;
+
+use crate::protocol::Encode;
+
+#[derive(Debug)]
+pub struct Position {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+}
+
+#[bitfield(u64)]
+pub struct PackedPosition {
+    #[bits(26)]
+    pub x: i32,
+    #[bits(26)]
+    pub z: i32,
+    #[bits(12)]
+    pub y: i32,
+}
+
+impl Position {
+    #[must_use]
+    pub fn new(x: i32, y: i32, z: i32) -> Self {
+        Self { x, y, z }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum EncodingError {
+    #[error("value is out of bounds")]
+    OutOfBounds,
+}
+
+impl TryFrom<&Position> for PackedPosition {
+    type Error = EncodingError;
+
+    fn try_from(value: &Position) -> std::result::Result<Self, Self::Error> {
+        match (value.x, value.y, value.z) {
+            (-0x2000000..=0x1ffffff, -0x800..=0x7ff, -0x2000000..=0x1ffffff) => {
+                Ok(PackedPosition::new()
+                    .with_x(value.x)
+                    .with_y(value.y)
+                    .with_z(value.z))
+            }
+            _ => Err(EncodingError::OutOfBounds),
+        }
+    }
+}
+
+impl Encode for Position {
+    fn encode(&self, w: impl std::io::Write) -> Result<()> {
+        let encoded: PackedPosition = self.try_into()?;
+        encoded.encode(w)
+    }
+}
+
+impl Encode for PackedPosition {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        Ok(w.write_u64::<BigEndian>(self.0)?)
+    }
+}

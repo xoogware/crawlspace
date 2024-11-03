@@ -28,6 +28,7 @@ use tokio::{
 
 use crate::protocol::{self, ClientboundPacket, Frame, ServerboundPacket};
 
+#[derive(Debug)]
 pub struct NetIo {
     stream: TcpStream,
     frame: Frame,

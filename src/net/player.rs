@@ -17,18 +17,26 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use color_eyre::eyre::Result;
 use serde_json::json;
-use tokio::{net::TcpStream, time::timeout};
+use tokio::{
+    net::TcpStream,
+    sync::{Mutex, OwnedSemaphorePermit, RwLock},
+    time::timeout,
+};
 
 use crate::{
     protocol::{
-        datatypes::Bounded,
+        datatypes::{Bounded, VarInt},
         packets::{
-            FinishConfigurationAckS, FinishConfigurationC, HandshakeS, KnownPacksC, KnownPacksS,
-            LoginAckS, LoginStartS, LoginSuccessC, Ping, StatusRequestS, StatusResponseC,
+            login::{
+                FinishConfigurationAckS, FinishConfigurationC, HandshakeS, KnownPacksC,
+                KnownPacksS, LoginAckS, LoginStartS, LoginSuccessC, Ping, StatusRequestS,
+                StatusResponseC,
+            },
+            play::LoginPlayC,
         },
         PacketState,
     },
@@ -36,39 +44,47 @@ use crate::{
 };
 
 #[cfg(feature = "encryption")]
-use crate::protocol::{
-    datatypes::{Bytes, VarInt},
-    packets::PluginRequestC,
-};
+use crate::protocol::{datatypes::Bytes, packets::PluginRequestC};
 
 use super::io::NetIo;
 
+#[derive(Clone, Debug)]
 pub struct Player {
     pub id: u16,
-    io: NetIo,
+    _permit: Arc<OwnedSemaphorePermit>,
+    io: Arc<Mutex<NetIo>>,
 
     crawlstate: CrawlState,
+    packet_state: Arc<RwLock<PacketState>>,
 }
 
 impl Player {
     #[must_use]
-    pub fn new(crawlstate: CrawlState, id: u16, connection: TcpStream) -> Self {
+    pub fn new(
+        crawlstate: CrawlState,
+        permit: OwnedSemaphorePermit,
+        id: u16,
+        connection: TcpStream,
+    ) -> Self {
         Self {
             id,
-            io: NetIo::new(connection),
+            io: Arc::new(Mutex::new(NetIo::new(connection))),
+            _permit: Arc::new(permit),
 
             crawlstate,
+            packet_state: Arc::new(RwLock::new(PacketState::Handshaking)),
         }
     }
 
     pub async fn connect(&mut self) {
-        debug!(
-            "Handling new player (id {}) from {}",
-            self.id,
-            self.io
-                .peer_addr()
-                .map_or("Unknown".to_string(), |a| a.to_string()),
-        );
+        let io = self.io.clone();
+        let io = io.lock().await;
+        let addy = io
+            .peer_addr()
+            .map_or("Unknown".to_string(), |a| a.to_string());
+        drop(io);
+
+        debug!("Handling new player (id {}) from {}", self.id, addy);
 
         // crawlspace intentionally doesn't support legacy pings :3
         match timeout(Duration::from_secs(5), self.handshake()).await {
@@ -79,8 +95,11 @@ impl Player {
     }
 
     async fn handshake(&mut self) -> Result<()> {
-        let p = self.io.rx::<HandshakeS>().await?;
         let state = self.crawlstate.clone();
+        let io = self.io.clone();
+        let mut io = io.lock().await;
+
+        let p = io.rx::<HandshakeS>().await?;
 
         if p.protocol_version.0 != state.version_number {
             warn!(
@@ -91,12 +110,15 @@ impl Player {
 
         let next_state = p.next_state;
 
+        drop(io);
+
         match next_state {
             PacketState::Status => {
                 self.handle_status().await?;
             }
             PacketState::Login => {
                 self.login().await?;
+                self.begin_play().await?;
             }
             s => unimplemented!("state {:#?} unimplemented after handshake", s),
         }
@@ -105,7 +127,10 @@ impl Player {
     }
 
     async fn handle_status(&mut self) -> Result<()> {
-        self.io.rx::<StatusRequestS>().await?;
+        let io = self.io.clone();
+        let mut io = io.lock().await;
+
+        io.rx::<StatusRequestS>().await?;
         let state = self.crawlstate.clone();
 
         let res = json!({
@@ -127,17 +152,19 @@ impl Player {
             json_respose: &res.to_string(),
         };
 
-        self.io.tx(&res).await?;
-        let ping = self.io.rx::<Ping>().await?;
-        self.io.tx(&ping).await?;
+        io.tx(&res).await?;
+        let ping = io.rx::<Ping>().await?;
+        io.tx(&ping).await?;
 
         Ok(())
     }
 
     async fn login(&mut self) -> Result<()> {
         let state = self.crawlstate.clone();
+        let io = self.io.clone();
+        let mut io = io.lock().await;
 
-        let login = self.io.rx::<LoginStartS>().await?;
+        let login = io.rx::<LoginStartS>().await?;
 
         // need to manually clone this or else the reference to self.io lives too long
         // TODO: clean up lifetimes on encode/decode - possibly just clone strings?
@@ -154,21 +181,44 @@ impl Player {
             strict_error_handling: false,
         };
 
-        // TODO: skins
-        #[cfg(feature = "skins")]
-        {}
-
-        self.io.tx(&success).await?;
-        self.io.rx::<LoginAckS>().await?;
+        io.tx(&success).await?;
+        io.rx::<LoginAckS>().await?;
 
         let clientbound_known_packs = KnownPacksC::of_version(&state.version_name);
-        self.io.tx(&clientbound_known_packs).await?;
+        io.tx(&clientbound_known_packs).await?;
 
         // TODO: maybe(?) actually handle this
-        self.io.rx::<KnownPacksS>().await?;
+        io.rx::<KnownPacksS>().await?;
 
-        self.io.tx(&FinishConfigurationC).await?;
-        self.io.rx::<FinishConfigurationAckS>().await?;
+        io.tx(&FinishConfigurationC).await?;
+        io.rx::<FinishConfigurationAckS>().await?;
+
+        Ok(())
+    }
+
+    async fn begin_play(&mut self) -> Result<()> {
+        let packet_state = self.packet_state.clone();
+        let packet_state = packet_state.write().await;
+
+        let state = self.crawlstate.clone();
+        let io = self.io.clone();
+        let mut io = io.lock().await;
+
+        let max_players: i32 = state.max_players.try_into().unwrap_or(50);
+
+        let login = LoginPlayC {
+            entity_id: self.id as i32,
+            is_hardcore: false,
+            dimension_names: vec![Bounded::<&'static str>("the_end")],
+            max_players: VarInt(max_players),
+            view_distance: VarInt(32),
+            simulation_distance: VarInt(8),
+            reduced_debug_info: cfg!(debug_assertions),
+        };
+
+        // FIXME: GROSS LOL?????? this should(?) change ownership of the player to the server
+        // thread but realistically who knows burhhhh
+        state.player_send.send(Arc::new(self.clone())).await?;
 
         Ok(())
     }

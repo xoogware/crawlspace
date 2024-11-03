@@ -30,7 +30,7 @@ use super::{
 #[cfg(feature = "encryption")]
 type _Cipher = cfb8::Encryptor<aes::Aes128>;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Encoder {
     buf: BytesMut,
 }
