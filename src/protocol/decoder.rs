@@ -27,12 +27,14 @@ use super::{
     ServerboundPacket,
 };
 
-type Cipher = cfb8::Decryptor<aes::Aes128>;
+#[cfg(feature = "encryption")]
+type _Cipher = cfb8::Decryptor<aes::Aes128>;
 
 #[derive(Default)]
 pub struct Decoder {
     buf: BytesMut,
-    compression_threshold: i32,
+    #[cfg(feature = "encryption")]
+    _compression_threshold: i32,
 }
 
 pub struct Frame {
@@ -71,7 +73,8 @@ impl Decoder {
     pub fn new() -> Self {
         Self {
             buf: BytesMut::default(),
-            compression_threshold: -1, // disabled
+            #[cfg(feature = "encryption")]
+            _compression_threshold: -1, // disabled
         }
     }
 

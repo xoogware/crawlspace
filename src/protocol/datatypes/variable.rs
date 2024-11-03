@@ -78,6 +78,10 @@ macro_rules! make_var_num {
                     }
                 }
 
+                if r.len() > 0 {
+                    Err(VariableDecodeError::TooLong)?;
+                }
+
                 Err(VariableDecodeError::Incomplete)?
             }
         }

@@ -20,5 +20,5 @@
 pub struct World {}
 
 impl World {
-    pub async fn tick(&self) {}
+    pub async fn _tick(&self) {}
 }

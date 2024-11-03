@@ -76,7 +76,7 @@ impl<'a, const BOUND: usize> Encode for Bounded<Bytes<'a>, BOUND> {
         let len = self.0 .0.len();
         ensure!(len < BOUND, "length of bytes {len} exceeds bound {BOUND}");
         VarInt(len as i32).encode(&mut w)?;
-        Ok(self.0.encode(&mut w)?)
+        self.0.encode(&mut w)
     }
 }
 

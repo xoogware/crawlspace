@@ -26,7 +26,7 @@ use tokio::{
     net::TcpStream,
 };
 
-use crate::protocol::{self, ClientboundPacket, Decode, Frame, ServerboundPacket};
+use crate::protocol::{self, ClientboundPacket, Frame, ServerboundPacket};
 
 pub struct NetIo {
     stream: TcpStream,

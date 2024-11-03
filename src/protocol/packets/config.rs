@@ -17,7 +17,6 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-
 use color_eyre::eyre::{ensure, Result};
 
 use crate::protocol::{
@@ -76,8 +75,8 @@ impl<'a> KnownPacksC<'a> {
 
 #[derive(Debug)]
 pub struct KnownPacksS<'a> {
-    pub known_pack_count: VarInt,
-    pub known_packs: Vec<KnownPack<'a>>,
+    pub _known_pack_count: VarInt,
+    pub _known_packs: Vec<KnownPack<'a>>,
 }
 
 impl Packet for KnownPacksS<'_> {
@@ -90,8 +89,8 @@ impl<'a> Decode<'a> for KnownPacksS<'a> {
         ensure!(known_pack_count.0 >= 0, "Known pack count was less than 0");
 
         Ok(Self {
-            known_packs: Vec::decode(known_pack_count.0 as usize, r)?,
-            known_pack_count,
+            _known_packs: Vec::decode(known_pack_count.0 as usize, r)?,
+            _known_pack_count: known_pack_count,
         })
     }
 }

@@ -27,7 +27,8 @@ use super::{
     ClientboundPacket,
 };
 
-type Cipher = cfb8::Encryptor<aes::Aes128>;
+#[cfg(feature = "encryption")]
+type _Cipher = cfb8::Encryptor<aes::Aes128>;
 
 #[derive(Default)]
 pub struct Encoder {
@@ -41,11 +42,11 @@ impl Encoder {
     }
 
     #[inline]
-    pub fn append(&mut self, bytes: &[u8]) {
+    pub fn _append(&mut self, bytes: &[u8]) {
         self.buf.extend_from_slice(bytes);
     }
 
-    pub fn prepend_packet<P>(&mut self, packet: &P) -> Result<()>
+    pub fn _prepend_packet<P>(&mut self, packet: &P) -> Result<()>
     where
         P: ClientboundPacket,
     {

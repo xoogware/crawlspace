@@ -21,22 +21,24 @@ use std::time::Duration;
 
 use color_eyre::eyre::Result;
 use serde_json::json;
-use tokio::{
-    net::TcpStream,
-    time::{timeout},
-};
+use tokio::{net::TcpStream, time::timeout};
 
 use crate::{
     protocol::{
-        datatypes::{Bounded, Bytes, VarInt},
+        datatypes::Bounded,
         packets::{
-            FinishConfigurationAckS, FinishConfigurationC, HandshakeS, KnownPacksC,
-            KnownPacksS, LoginAckS, LoginStartS, LoginSuccessC, Ping, PluginRequestC,
-            StatusRequestS, StatusResponseC,
+            FinishConfigurationAckS, FinishConfigurationC, HandshakeS, KnownPacksC, KnownPacksS,
+            LoginAckS, LoginStartS, LoginSuccessC, Ping, StatusRequestS, StatusResponseC,
         },
         PacketState,
     },
     CrawlState,
+};
+
+#[cfg(feature = "encryption")]
+use crate::protocol::{
+    datatypes::{Bytes, VarInt},
+    packets::PluginRequestC,
 };
 
 use super::io::NetIo;
@@ -78,6 +80,15 @@ impl Player {
 
     async fn handshake(&mut self) -> Result<()> {
         let p = self.io.rx::<HandshakeS>().await?;
+        let state = self.crawlstate.clone();
+
+        if p.protocol_version.0 != state.version_number {
+            warn!(
+                "Client protocol version {} doesn't match server version {}!",
+                p.protocol_version.0, state.version_number
+            );
+        }
+
         let next_state = p.next_state;
 
         match next_state {
@@ -133,7 +144,8 @@ impl Player {
         let uuid = login.player_uuid;
         let username = login.name.0.to_owned();
 
-        //self.login_velocity(&username).await?;
+        #[cfg(feature = "encryption")]
+        self.login_velocity(&username).await?;
 
         let success = LoginSuccessC {
             uuid,
@@ -161,7 +173,8 @@ impl Player {
         Ok(())
     }
 
-    async fn login_velocity(&mut self, username: &str) -> Result<()> {
+    #[cfg(feature = "encryption")]
+    async fn login_velocity(&mut self, _username: &str) -> Result<()> {
         let req = PluginRequestC {
             message_id: VarInt(0),
             channel: Bounded("velocity:player_info"),

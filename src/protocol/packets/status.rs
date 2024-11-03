@@ -48,7 +48,7 @@ impl<'a> Packet for StatusResponseC<'a> {
 
 impl<'a> Encode for StatusResponseC<'a> {
     fn encode(&self, mut w: impl Write) -> Result<()> {
-        Ok(self.json_respose.encode(&mut w)?)
+        self.json_respose.encode(&mut w)
     }
 }
 

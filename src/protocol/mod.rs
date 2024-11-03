@@ -18,12 +18,10 @@
  */
 
 pub mod datatypes {
-    mod ident;
     mod impls;
     mod string;
     mod variable;
 
-    pub use ident::*;
     pub use impls::*;
     pub use string::*;
     pub use variable::*;
@@ -66,15 +64,10 @@ pub trait DecodeSized<'a>: Sized {
     fn decode(times: usize, r: &mut &'a [u8]) -> Result<Self>;
 }
 
-pub enum PacketDirection {
-    Clientbound,
-    Serverbound,
-}
-
 #[derive(Clone, Copy, Debug)]
 pub enum PacketState {
-    Handshaking,
-    Play,
+    _Handshaking,
+    _Play,
     Status,
     Login,
     Transfer,
@@ -103,11 +96,9 @@ pub trait Packet {
     const ID: i32;
 }
 
-#[expect(private_bounds)]
 pub trait ServerboundPacket<'a>: Packet + Decode<'a> + Debug {}
 impl<'a, P> ServerboundPacket<'a> for P where P: Packet + Decode<'a> + Debug {}
 
-#[expect(private_bounds)]
 pub trait ClientboundPacket: Packet + Encode + Debug {
     fn encode_packet(&self, mut w: impl Write) -> Result<()>
     where

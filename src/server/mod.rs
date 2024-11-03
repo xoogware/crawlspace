@@ -26,13 +26,15 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use world::World;
 
+use crate::net::player::Player;
+
 use self::ticker::Ticker;
 
 pub struct Server {
     pub ticker: Ticker,
 
-    world: Option<Arc<World>>,
-    players: Arc<Mutex<Vec<uuid::Uuid>>>,
+    _world: Option<Arc<World>>,
+    players: Arc<Mutex<Vec<Player>>>,
 }
 
 impl Server {
@@ -40,13 +42,13 @@ impl Server {
     pub fn new(tick_rate: u8) -> Self {
         Server {
             ticker: Ticker::new(tick_rate),
-            world: None,
+            _world: None,
             players: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
     async fn tick(&self) {
         let players = self.players.lock();
-        players.iter().for_each(|p| trace!("Ticking {p}"));
+        players.iter().for_each(|p| trace!("Ticking {}", p.id));
     }
 }

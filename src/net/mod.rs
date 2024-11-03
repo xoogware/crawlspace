@@ -22,7 +22,7 @@ use player::Player;
 use tokio::net::TcpListener;
 
 mod io;
-mod player;
+pub mod player;
 
 use crate::CrawlState;
 
@@ -46,7 +46,7 @@ async fn net_handler(crawlstate: CrawlState, listener: TcpListener) {
             }
             Ok(permit) => match listener.accept().await {
                 Err(why) => error!("Failed to accept client, dropping: {why}"),
-                Ok((conn, addy)) => {
+                Ok((conn, _addy)) => {
                     let client_id = client_counter;
                     client_counter = client_counter.wrapping_add(1);
                     let state = crawlstate.clone();
