@@ -20,7 +20,6 @@
 use color_eyre::eyre::Result;
 use player::Player;
 use tokio::net::TcpListener;
-use uuid::Uuid;
 
 mod io;
 mod player;

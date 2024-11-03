@@ -17,14 +17,14 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use bytes::{Buf, BufMut, BytesMut};
-use color_eyre::eyre::{bail, ensure, Context, Result};
+use bytes::{BufMut, BytesMut};
+use color_eyre::eyre::{ensure, Result};
 
-use crate::protocol::{Decode, Encode, MAX_PACKET_SIZE};
+use crate::protocol::{Encode, MAX_PACKET_SIZE};
 
 use super::{
-    datatypes::{VarInt, VariableDecodeError, VariableNumber},
-    ClientboundPacket, ServerboundPacket,
+    datatypes::{VarInt, VariableNumber},
+    ClientboundPacket,
 };
 
 type Cipher = cfb8::Encryptor<aes::Aes128>;

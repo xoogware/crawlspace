@@ -17,14 +17,12 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::borrow::Cow;
 
 use color_eyre::eyre::Result;
 use uuid::Uuid;
 
 use crate::protocol::{
-    datatypes::{Bounded, Bytes, Ident, VarInt},
-    ClientboundPacket, Decode, Encode, Packet,
+    datatypes::{Bounded, Bytes, VarInt}, Decode, Encode, Packet,
 };
 
 #[derive(Debug)]

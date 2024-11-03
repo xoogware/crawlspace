@@ -19,19 +19,18 @@
 
 use std::time::Duration;
 
-use color_eyre::eyre::{bail, Result};
+use color_eyre::eyre::Result;
 use serde_json::json;
 use tokio::{
     net::TcpStream,
-    time::{self, sleep, timeout},
+    time::{timeout},
 };
-use uuid::Uuid;
 
 use crate::{
     protocol::{
-        datatypes::{Bounded, Bytes, Ident, VarInt},
+        datatypes::{Bounded, Bytes, VarInt},
         packets::{
-            FinishConfigurationAckS, FinishConfigurationC, HandshakeS, KnownPack, KnownPacksC,
+            FinishConfigurationAckS, FinishConfigurationC, HandshakeS, KnownPacksC,
             KnownPacksS, LoginAckS, LoginStartS, LoginSuccessC, Ping, PluginRequestC,
             StatusRequestS, StatusResponseC,
         },

@@ -17,7 +17,6 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::borrow::Cow;
 
 use color_eyre::eyre::{ensure, Result};
 
