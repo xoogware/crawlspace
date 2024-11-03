@@ -17,6 +17,9 @@ on:
         required: false
         type: string
 
+env:
+  RUSTFLAGS: "-Dwarnings"
+
 jobs:
   clippy:
     runs-on: ubuntu-latest
@@ -25,7 +28,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Run clippy
-        run: nix develop --command cargo clippy
+        run: nix develop --command cargo clippy --all-targets --all-features
 
   build_release:
     needs: clippy
