@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Run clippy
         run: nix develop --command cargo clippy
@@ -34,6 +35,7 @@ jobs:
       BUILD_COMMAND: ${{ (github.event_name == 'workflow_dispatch' && inputs.buildType == 'Release') && 'nix build .#release' || 'nix build .' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Build Crawlspace
         run: BUILD_COMMAND
