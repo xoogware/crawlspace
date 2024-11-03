@@ -1,0 +1,41 @@
+name: CI
+on:
+  push:
+  release:
+  workflow_dispatch:
+    inputs:
+      buildType:
+        description: 'Build Type'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+      version:
+        description: 'Version Tag (defaults to commit hash)'
+        required: false
+        type: string
+
+jobs:
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Run clippy
+        run: nix develop --command cargo clippy
+
+  build_release:
+    needs: clippy
+    runs-on: ubuntu-latest
+    if: ${{ (github.event_name == 'release') || github.event_name == 'workflow_dispatch' }}
+    env:
+      BUILD_COMMAND: ${{ (github.event_name == 'workflow_dispatch' && inputs.buildType == 'Release') && 'nix build .#release' || 'nix build .' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Build Crawlspace
+        run: BUILD_COMMAND
+      - uses: actions/upload-artifact@v4
+        path: ./result/bin/crawlspace
