@@ -37,7 +37,7 @@ pub struct Decoder {
     _compression_threshold: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Frame {
     pub id: i32,
     pub body: BytesMut,

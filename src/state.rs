@@ -21,7 +21,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 
 use tokio::sync::{mpsc, Mutex, Semaphore};
 
-use crate::net::player::Player;
+use crate::net::player::{Player, SharedPlayer};
 
 #[derive(Debug)]
 pub struct State {
@@ -32,8 +32,8 @@ pub struct State {
     pub version_number: i32,
     pub port: u16,
 
-    pub player_send: mpsc::Sender<Arc<Player>>,
-    pub player_recv: Mutex<mpsc::Receiver<Arc<Player>>>,
+    pub player_send: mpsc::Sender<SharedPlayer>,
+    pub player_recv: Mutex<mpsc::Receiver<SharedPlayer>>,
 
     pub shutdown_send: mpsc::UnboundedSender<()>,
     pub shutdown_recv: Mutex<mpsc::UnboundedReceiver<()>>,

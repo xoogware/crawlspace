@@ -33,15 +33,16 @@ pub mod packets {
     pub mod login {
         mod config;
         mod handshake;
+        #[expect(clippy::module_inception)]
         mod login;
-        mod registry;
         mod status;
 
         pub use config::*;
         pub use handshake::*;
         pub use login::*;
-        pub use registry::*;
         pub use status::*;
+
+        pub mod registry;
     }
 
     pub mod play {

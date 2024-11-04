@@ -63,12 +63,19 @@ impl Encode for KnownPack<'_> {
 impl<'a> KnownPacksC<'a> {
     pub fn of_version(version: &'a str) -> Self {
         Self {
-            known_pack_count: VarInt(1),
-            known_packs: vec![KnownPack {
-                namespace: Bounded("minecraft"),
-                id: Bounded("core"),
-                version: Bounded(version),
-            }],
+            known_pack_count: VarInt(2),
+            known_packs: vec![
+                KnownPack {
+                    namespace: Bounded("minecraft"),
+                    id: Bounded("core"),
+                    version: Bounded(version),
+                },
+                KnownPack {
+                    namespace: Bounded("minecraft"),
+                    id: Bounded("root"),
+                    version: Bounded(version),
+                },
+            ],
         }
     }
 }

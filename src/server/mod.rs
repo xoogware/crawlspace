@@ -25,7 +25,10 @@ use std::sync::Arc;
 
 use world::World;
 
-use crate::{net::player::Player, CrawlState};
+use crate::{
+    net::player::{Player, SharedPlayer},
+    CrawlState,
+};
 
 use self::ticker::Ticker;
 
@@ -34,7 +37,7 @@ pub struct Server {
     pub ticker: Ticker,
 
     _world: Option<Arc<World>>,
-    players: Vec<Arc<Player>>,
+    players: Vec<SharedPlayer>,
 
     crawlstate: CrawlState,
 }
@@ -59,6 +62,8 @@ impl Server {
             self.players.push(p);
         }
 
-        self.players.iter().for_each(|p| trace!("Ticking {}", p.id));
+        self.players
+            .iter()
+            .for_each(|p| trace!("Ticking {}", p.id()));
     }
 }

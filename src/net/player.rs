@@ -20,6 +20,7 @@
 use std::{sync::Arc, time::Duration};
 
 use color_eyre::eyre::Result;
+// use registry::Registry;
 use serde_json::json;
 use tokio::{
     net::TcpStream,
@@ -31,11 +32,7 @@ use crate::{
     protocol::{
         datatypes::{Bounded, VarInt},
         packets::{
-            login::{
-                DimensionType, FinishConfigurationAckS, FinishConfigurationC, HandshakeS,
-                KnownPacksC, KnownPacksS, LoginAckS, LoginStartS, LoginSuccessC, Ping, Registry,
-                StatusRequestS, StatusResponseC,
-            },
+            login::*,
             play::{Gamemode, LoginPlayC},
         },
         PacketState,
@@ -48,17 +45,20 @@ use crate::protocol::{datatypes::Bytes, packets::PluginRequestC};
 
 use super::io::NetIo;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Player {
     pub id: u16,
-    _permit: Arc<OwnedSemaphorePermit>,
-    io: Arc<Mutex<NetIo>>,
+    _permit: OwnedSemaphorePermit,
+    io: Mutex<NetIo>,
 
     crawlstate: CrawlState,
-    packet_state: Arc<RwLock<PacketState>>,
+    packet_state: RwLock<PacketState>,
 }
 
-impl Player {
+#[derive(Clone, Debug)]
+pub struct SharedPlayer(Arc<Player>);
+
+impl SharedPlayer {
     #[must_use]
     pub fn new(
         crawlstate: CrawlState,
@@ -66,38 +66,57 @@ impl Player {
         id: u16,
         connection: TcpStream,
     ) -> Self {
-        Self {
+        Self(Arc::new(Player {
             id,
-            io: Arc::new(Mutex::new(NetIo::new(connection))),
-            _permit: Arc::new(permit),
+            io: Mutex::new(NetIo::new(connection)),
+            _permit: permit,
 
             crawlstate,
-            packet_state: Arc::new(RwLock::new(PacketState::Handshaking)),
-        }
+            packet_state: RwLock::new(PacketState::Handshaking),
+        }))
     }
 
-    pub async fn connect(&mut self) {
-        let io = self.io.clone();
-        let io = io.lock().await;
-        let addy = io
-            .peer_addr()
-            .map_or("Unknown".to_string(), |a| a.to_string());
-        drop(io);
+    #[inline(always)]
+    pub fn id(&self) -> u16 {
+        self.0.id
+    }
 
-        debug!("Handling new player (id {}) from {}", self.id, addy);
+    pub async fn connect(&self) {
+        {
+            let io = self.0.io.lock().await;
+            let addy = io
+                .peer_addr()
+                .map_or("Unknown".to_string(), |a| a.to_string());
+            debug!("Handling new player (id {}) from {}", self.0.id, addy);
+        }
 
         // crawlspace intentionally doesn't support legacy pings :3
         match timeout(Duration::from_secs(5), self.handshake()).await {
-            Err(e) => warn!("Timed out waiting for {} to connect: {e}", self.id),
+            Err(e) => warn!("Timed out waiting for {} to connect: {e}", self.0.id),
             Ok(Err(why)) => warn!("Error handshaking: {why}"),
-            Ok(Ok(())) => debug!("Handshake complete for client {}.", self.id),
+            Ok(Ok(())) => {
+                let s = self.0.packet_state.read().await;
+                if let PacketState::Status = *s {
+                    return;
+                }
+                drop(s);
+
+                debug!(
+                    "Handshake complete for client {}. Starting play loop.",
+                    self.0.id
+                );
+
+                match self.begin_play().await {
+                    Ok(()) => debug!("Play loop for {} done.", self.id()),
+                    Err(why) => error!("Failed to play player {}! {why}", self.id()),
+                }
+            }
         }
     }
 
-    async fn handshake(&mut self) -> Result<()> {
-        let state = self.crawlstate.clone();
-        let io = self.io.clone();
-        let mut io = io.lock().await;
+    async fn handshake(&self) -> Result<()> {
+        let state = self.0.crawlstate.clone();
+        let mut io = self.0.io.lock().await;
 
         let p = io.rx::<HandshakeS>().await?;
 
@@ -109,7 +128,6 @@ impl Player {
         }
 
         let next_state = p.next_state;
-
         drop(io);
 
         match next_state {
@@ -118,7 +136,6 @@ impl Player {
             }
             PacketState::Login => {
                 self.login().await?;
-                self.begin_play().await?;
             }
             s => unimplemented!("state {:#?} unimplemented after handshake", s),
         }
@@ -126,12 +143,11 @@ impl Player {
         Ok(())
     }
 
-    async fn handle_status(&mut self) -> Result<()> {
-        let io = self.io.clone();
-        let mut io = io.lock().await;
+    async fn handle_status(&self) -> Result<()> {
+        let mut io = self.0.io.lock().await;
 
         io.rx::<StatusRequestS>().await?;
-        let state = self.crawlstate.clone();
+        let state = self.0.crawlstate.clone();
 
         let res = json!({
             "version": {
@@ -159,10 +175,9 @@ impl Player {
         Ok(())
     }
 
-    async fn login(&mut self) -> Result<()> {
-        let state = self.crawlstate.clone();
-        let io = self.io.clone();
-        let mut io = io.lock().await;
+    async fn login(&self) -> Result<()> {
+        let state = self.0.crawlstate.clone();
+        let mut io = self.0.io.lock().await;
 
         let login = io.rx::<LoginStartS>().await?;
 
@@ -190,10 +205,7 @@ impl Player {
         // TODO: maybe(?) actually handle this
         io.rx::<KnownPacksS>().await?;
 
-        let mut world_registry = Registry::<DimensionType>::new();
-        world_registry.insert("crawlspace:limbo", Some(DimensionType::the_end()));
-
-        io.tx(&world_registry).await?;
+        // let registry = Registry::DEFAULT;
 
         io.tx(&FinishConfigurationC).await?;
         io.rx::<FinishConfigurationAckS>().await?;
@@ -201,28 +213,27 @@ impl Player {
         Ok(())
     }
 
-    async fn begin_play(&mut self) -> Result<()> {
-        let packet_state = self.packet_state.clone();
-        let packet_state = packet_state.write().await;
+    async fn begin_play(&self) -> Result<()> {
+        let mut packet_state = self.0.packet_state.write().await;
+        *packet_state = PacketState::Play;
 
-        let state = self.crawlstate.clone();
-        let io = self.io.clone();
-        let mut io = io.lock().await;
+        let state = self.0.crawlstate.clone();
+        let mut io = self.0.io.lock().await;
 
         let max_players: i32 = state.max_players.try_into().unwrap_or(50);
 
         let login = LoginPlayC {
-            entity_id: self.id as i32,
+            entity_id: self.0.id as i32,
             is_hardcore: false,
-            dimension_names: vec![Bounded::<&'static str>("crawlspace:limbo")],
+            dimension_names: vec![Bounded::<&'static str>("minecraft:the_end")],
             max_players: VarInt(max_players),
             view_distance: VarInt(32),
             simulation_distance: VarInt(8),
             reduced_debug_info: !cfg!(debug_assertions),
             enable_respawn_screen: false,
             do_limited_crafting: false,
-            dimension_type: Bounded::<&'static str>("crawlspace:limbo"),
-            dimension_name: Bounded::<&'static str>("Limbo"),
+            dimension_type: VarInt(0),
+            dimension_name: Bounded::<&'static str>("minecraft:the_end"),
             hashed_seed: 0,
             gamemode: Gamemode::Adventure,
             previous_gamemode: None,
@@ -237,7 +248,7 @@ impl Player {
 
         // FIXME: GROSS LOL?????? this should(?) change ownership of the player to the server
         // thread but realistically who knows burhhhh
-        state.player_send.send(Arc::new(self.clone())).await?;
+        state.player_send.send(self.clone()).await?;
 
         Ok(())
     }

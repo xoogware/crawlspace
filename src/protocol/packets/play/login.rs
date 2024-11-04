@@ -42,7 +42,7 @@ pub struct LoginPlayC<'a> {
     /// Whether players can only craft recipes they have already unlocked. Currently unused by the client.
     pub do_limited_crafting: bool,
     /// okay i don't feel like copying these anymore https://wiki.vg/Protocol#Login_.28play.29
-    pub dimension_type: Bounded<&'a str>,
+    pub dimension_type: VarInt,
     pub dimension_name: Bounded<&'a str>,
     /// first 8 bytes of seed sha256 - probably unneeded?
     pub hashed_seed: i64,
