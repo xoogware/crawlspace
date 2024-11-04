@@ -30,6 +30,7 @@ pub struct State {
     pub description: String,
     pub version_name: String,
     pub version_number: i32,
+    pub port: u16,
 
     pub player_send: mpsc::Sender<Arc<Player>>,
     pub player_recv: Mutex<mpsc::Receiver<Arc<Player>>>,
@@ -47,6 +48,7 @@ impl State {
         version_number: i32,
         description: &str,
         max_players: usize,
+        port: u16,
     ) -> Self {
         let max = max_players.min(Semaphore::MAX_PERMITS);
 
@@ -63,6 +65,7 @@ impl State {
             description: description.to_owned(),
             version_name: version_name.to_owned(),
             version_number: version_number.to_owned(),
+            port,
 
             player_send,
             player_recv: Mutex::new(player_recv),

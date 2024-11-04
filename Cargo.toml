@@ -42,4 +42,6 @@ uuid = "1.11.0"
 default = []
 compression = []
 encryption = ["dep:cfb8", "dep:aes"]
+lan = []
+
 full = ["compression", "encryption"]

@@ -53,19 +53,23 @@ async fn main() -> Result<()> {
         false => tracing_subscriber::fmt::init(),
     }
 
-    let state = Arc::new(state::State::new(
-        VERSION,
-        VERSION_NUM,
-        DESCRIPTION,
-        MAX_PLAYERS,
-    ));
-
     let port = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse::<u16>().ok())
         .unwrap_or(25565);
 
-    net::spawn_net_handler(state.clone(), port).await?;
+    let state = Arc::new(state::State::new(
+        VERSION,
+        VERSION_NUM,
+        DESCRIPTION,
+        MAX_PLAYERS,
+        port,
+    ));
+
+    #[cfg(feature = "lan")]
+    net::spawn_lan_broadcast(state.clone()).await?;
+
+    net::spawn_net_handler(state.clone()).await?;
 
     let server = Server::new(state.clone(), TICK_RATE);
 

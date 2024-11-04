@@ -17,17 +17,42 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use std::time::Duration;
+
 use color_eyre::eyre::Result;
-use player::Player;
-use tokio::net::TcpListener;
+use player::SharedPlayer;
+use tokio::{
+    net::{TcpListener, UdpSocket},
+    time,
+};
 
 mod io;
 pub mod player;
 
 use crate::CrawlState;
 
-pub async fn spawn_net_handler(state: CrawlState, port: u16) -> Result<()> {
-    let listener = TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+#[cfg(feature = "lan")]
+pub async fn spawn_lan_broadcast(state: CrawlState) -> Result<()> {
+    let port = state.port;
+    let sock = UdpSocket::bind("0.0.0.0:9753").await?;
+
+    tokio::spawn(async move {
+        let motd = format!("[MOTD]{}[/MOTD][AD]{port}[/AD]", state.description);
+        warn!("Advertising on LAN: {motd}");
+        let motd = motd.as_bytes();
+
+        loop {
+            let _ = sock.send_to(motd, "224.0.2.60:4445").await;
+            time::sleep(Duration::from_millis(1500)).await;
+        }
+    });
+
+    Ok(())
+}
+
+pub async fn spawn_net_handler(state: CrawlState) -> Result<()> {
+    let port = state.port;
+    let listener = TcpListener::bind(format!("[::]:{port}")).await?;
     warn!("Listening on port {port}.");
     tokio::spawn(net_handler(state, listener));
     Ok(())
@@ -55,7 +80,7 @@ async fn net_handler(crawlstate: CrawlState, listener: TcpListener) {
                         // TODO: handle initial connection here! DO NOT DROP PERMIT UNTIL PLAYER
                         // DISCONNECTS
                         tokio::spawn(async move {
-                            let mut player = Player::new(state, permit, client_id, conn);
+                            let player = SharedPlayer::new(state, permit, client_id, conn);
                             player.connect().await;
                         });
                     });
