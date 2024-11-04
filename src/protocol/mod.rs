@@ -34,11 +34,13 @@ pub mod packets {
         mod config;
         mod handshake;
         mod login;
+        mod registry;
         mod status;
 
         pub use config::*;
         pub use handshake::*;
         pub use login::*;
+        pub use registry::*;
         pub use status::*;
     }
 

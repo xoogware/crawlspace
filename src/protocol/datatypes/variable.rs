@@ -17,8 +17,8 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use std::fmt::Display;
 use std::io::Write;
-use std::{arch::x86_64::*, fmt::Display};
 
 use byteorder::ReadBytesExt;
 use color_eyre::eyre::Result;
@@ -120,15 +120,11 @@ impl Encode for VarInt {
 impl VarLong {
     // how cute...
     #[inline(always)]
-    #[cfg(target_feature = "neon")]
-    fn num_to_vector_stage1(self) -> [u8; 16] {
-        unimplemented!()
-    }
-
-    #[inline(always)]
     #[cfg(target_feature = "bmi2")]
     fn num_to_vector_stage1(self) -> [u8; 16] {
+        use std::arch::x86_64::*;
         let mut res = [0u64; 2];
+
         let x = self.0 as u64;
 
         res[0] = unsafe { _pdep_u64(x, 0x7f7f7f7f7f7f7f7f) };
@@ -140,6 +136,7 @@ impl VarLong {
     #[inline(always)]
     #[cfg(all(target_feature = "avx2", not(all(target_feature = "bmi2"))))]
     fn num_to_vector_stage1(self) -> [u8; 16] {
+        use std::arch::x86_64::*;
         let mut res = [0u64; 2];
         let x = self;
 
@@ -175,11 +172,82 @@ impl VarLong {
 
         unsafe { core::mem::transmute(res) }
     }
+
+    // TODO: need to confirm this works. for now it's just a naive translation of avx2,
+    // but could definitely be improved -- blocking NEON implementation of Encode
+    //
+    // #[inline(always)]
+    // #[cfg(target_feature = "neon")]
+    // fn num_to_vector_stage1(self) -> [u8; 16] {
+    //     use std::arch::aarch64::*;
+    //
+    //     let mut res = [0u64; 2];
+    //     let x = self;
+    //
+    //     let b = unsafe { vdupq_n_s64(self.0 as i64) };
+    //     let c = unsafe {
+    //         vorrq_s64(
+    //             vorrq_s64(
+    //                 vshlq_s64(
+    //                     vandq_s64(
+    //                         b,
+    //                         vcombine_s64(
+    //                             vcreate_s64(0x000003f800000000),
+    //                             vcreate_s64(0x00000007f0000000),
+    //                         ),
+    //                     ),
+    //                     vcombine_s64(vcreate_s64(5), vcreate_s64(4)),
+    //                 ),
+    //                 vshlq_s64(
+    //                     vandq_s64(
+    //                         b,
+    //                         vcombine_s64(
+    //                             vcreate_s64(0x00fe000000000000),
+    //                             vcreate_s64(0x0001fc0000000000),
+    //                         ),
+    //                     ),
+    //                     vcombine_s64(vcreate_s64(7), vcreate_s64(6)),
+    //                 ),
+    //             ),
+    //             vorrq_s64(
+    //                 vshlq_s64(
+    //                     vandq_s64(
+    //                         b,
+    //                         vcombine_s64(
+    //                             vcreate_s64(0x0000000000003f80),
+    //                             vcreate_s64(0x000000000000007f),
+    //                         ),
+    //                     ),
+    //                     vcombine_s64(vcreate_s64(1), vcreate_s64(0)),
+    //                 ),
+    //                 vshlq_s64(
+    //                     vandq_s64(
+    //                         b,
+    //                         vcombine_s64(
+    //                             vcreate_s64(0x000000000fe00000),
+    //                             vcreate_s64(0x00000000001fc000),
+    //                         ),
+    //                     ),
+    //                     vcombine_s64(vcreate_s64(3), vcreate_s64(2)),
+    //                 ),
+    //             ),
+    //         )
+    //     };
+    //     let d = unsafe { vorrq_s64(c, vshrq_n_s64::<8>(c)) };
+    //
+    //     res[0] = unsafe { vgetq_lane_s64(d, 0) as u64 };
+    //     res[1] =
+    //         ((x.0 as u64 & 0x7f00000000000000) >> 56) | ((x.0 as u64 & 0x8000000000000000) >> 55);
+    //
+    //     unsafe { core::mem::transmute(res) }
+    // }
 }
 
 impl Encode for VarLong {
     // ...and here's the second branch ^_^
+    #[cfg(any(target_feature = "bmi2", target_feature = "avx2"))]
     fn encode(&self, mut w: impl Write) -> Result<()> {
+        use std::arch::x86_64::*;
         unsafe {
             // Break the number into 7-bit parts and spread them out into a vector
             let stage1: __m128i = std::mem::transmute(self.num_to_vector_stage1());
@@ -208,6 +276,23 @@ impl Encode for VarLong {
             Ok(w.write_all(
                 std::mem::transmute::<__m128i, [u8; 16]>(merged).get_unchecked(..bytes as usize),
             )?)
+        }
+    }
+
+    // TODO: implement this using neon? not likely we'll use arm-based servers but maybe nice for
+    // local testing?
+    #[cfg(not(any(target_feature = "bmi2", target_feature = "avx2")))]
+    fn encode(&self, mut w: impl Write) -> Result<()> {
+        use byteorder::WriteBytesExt;
+
+        let mut val = self.0 as u64;
+        loop {
+            if val & 0b1111111111111111111111111111111111111111111111111111111110000000 == 0 {
+                w.write_u8(val as u8)?;
+                return Ok(());
+            }
+            w.write_u8(val as u8 & 0b01111111 | 0b10000000)?;
+            val >>= 7;
         }
     }
 }

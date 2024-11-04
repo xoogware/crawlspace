@@ -32,11 +32,11 @@ use crate::{
         datatypes::{Bounded, VarInt},
         packets::{
             login::{
-                FinishConfigurationAckS, FinishConfigurationC, HandshakeS, KnownPacksC,
-                KnownPacksS, LoginAckS, LoginStartS, LoginSuccessC, Ping, StatusRequestS,
-                StatusResponseC,
+                DimensionType, FinishConfigurationAckS, FinishConfigurationC, HandshakeS,
+                KnownPacksC, KnownPacksS, LoginAckS, LoginStartS, LoginSuccessC, Ping, Registry,
+                StatusRequestS, StatusResponseC,
             },
-            play::LoginPlayC,
+            play::{Gamemode, LoginPlayC},
         },
         PacketState,
     },
@@ -190,6 +190,11 @@ impl Player {
         // TODO: maybe(?) actually handle this
         io.rx::<KnownPacksS>().await?;
 
+        let mut world_registry = Registry::<DimensionType>::new();
+        world_registry.insert("crawlspace:limbo", Some(DimensionType::the_end()));
+
+        io.tx(&world_registry).await?;
+
         io.tx(&FinishConfigurationC).await?;
         io.rx::<FinishConfigurationAckS>().await?;
 
@@ -209,12 +214,26 @@ impl Player {
         let login = LoginPlayC {
             entity_id: self.id as i32,
             is_hardcore: false,
-            dimension_names: vec![Bounded::<&'static str>("the_end")],
+            dimension_names: vec![Bounded::<&'static str>("crawlspace:limbo")],
             max_players: VarInt(max_players),
             view_distance: VarInt(32),
             simulation_distance: VarInt(8),
-            reduced_debug_info: cfg!(debug_assertions),
+            reduced_debug_info: !cfg!(debug_assertions),
+            enable_respawn_screen: false,
+            do_limited_crafting: false,
+            dimension_type: Bounded::<&'static str>("crawlspace:limbo"),
+            dimension_name: Bounded::<&'static str>("Limbo"),
+            hashed_seed: 0,
+            gamemode: Gamemode::Adventure,
+            previous_gamemode: None,
+            is_debug: false,
+            is_superflat: false,
+            death_location: None,
+            portal_cooldown: VarInt(0),
+            enforces_secure_chat: false,
         };
+
+        io.tx(&login).await?;
 
         // FIXME: GROSS LOL?????? this should(?) change ownership of the player to the server
         // thread but realistically who knows burhhhh

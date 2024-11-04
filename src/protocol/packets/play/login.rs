@@ -19,7 +19,7 @@
 
 use crate::protocol::{
     datatypes::{Bounded, Position, VarInt},
-    Encode,
+    Encode, Packet,
 };
 
 #[derive(Debug)]
@@ -42,12 +42,12 @@ pub struct LoginPlayC<'a> {
     /// Whether players can only craft recipes they have already unlocked. Currently unused by the client.
     pub do_limited_crafting: bool,
     /// okay i don't feel like copying these anymore https://wiki.vg/Protocol#Login_.28play.29
-    pub dimension_type: VarInt,
+    pub dimension_type: Bounded<&'a str>,
     pub dimension_name: Bounded<&'a str>,
     /// first 8 bytes of seed sha256 - probably unneeded?
     pub hashed_seed: i64,
     pub gamemode: Gamemode,
-    pub previous_gamemode: Gamemode<true>,
+    pub previous_gamemode: Option<Gamemode>,
     pub is_debug: bool,
     pub is_superflat: bool,
     pub death_location: Option<DeathLocation<'a>>,
@@ -56,42 +56,32 @@ pub struct LoginPlayC<'a> {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum Gamemode<const SIGNED: bool = false> {
-    None,
+pub enum Gamemode {
     Survival,
     Creative,
     Adventure,
     Spectator,
 }
 
-impl From<Gamemode<true>> for i8 {
-    fn from(value: Gamemode<true>) -> Self {
-        match value {
-            Gamemode::None => -1,
-            Gamemode::Survival => 0,
-            Gamemode::Creative => 1,
-            Gamemode::Adventure => 2,
-            Gamemode::Spectator => 3,
-        }
-    }
-}
-
-impl From<Gamemode<false>> for u8 {
-    fn from(value: Gamemode<false>) -> Self {
+impl From<Gamemode> for u8 {
+    fn from(value: Gamemode) -> Self {
         match value {
             Gamemode::Survival => 0,
             Gamemode::Creative => 1,
             Gamemode::Adventure => 2,
             Gamemode::Spectator => 3,
-            Gamemode::None => panic!("u8::from(Gamemode::None) called!"),
         }
     }
 }
 
 #[derive(Debug)]
-struct DeathLocation<'a> {
+pub struct DeathLocation<'a> {
     dimension_name: Bounded<&'a str>,
     death_location: Position,
+}
+
+impl Packet for LoginPlayC<'_> {
+    const ID: i32 = 0x2B;
 }
 
 impl<'a> Encode for LoginPlayC<'a> {
@@ -110,7 +100,12 @@ impl<'a> Encode for LoginPlayC<'a> {
         self.dimension_name.encode(&mut w)?;
         self.hashed_seed.encode(&mut w)?;
         u8::from(self.gamemode).encode(&mut w)?;
-        i8::from(self.previous_gamemode).encode(&mut w)?;
+
+        match self.previous_gamemode {
+            None => (-1).encode(&mut w)?,
+            Some(g) => u8::from(g).encode(&mut w)?,
+        }
+
         self.is_debug.encode(&mut w)?;
         self.is_superflat.encode(&mut w)?;
 
