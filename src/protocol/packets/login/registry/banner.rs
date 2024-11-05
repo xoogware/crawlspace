@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use super::RegistryItem;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BannerPattern {
     asset_id: String,
     translation_key: String,

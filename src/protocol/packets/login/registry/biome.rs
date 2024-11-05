@@ -19,10 +19,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{RegistryItem, StringOrCompound};
+use super::{deserialize_bool, RegistryItem, StringOrCompound};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Biome {
+    #[serde(deserialize_with = "deserialize_bool")]
     has_precipitation: i8,
     temperature: f32,
     temperature_modifier: Option<String>,
@@ -30,7 +31,7 @@ pub struct Biome {
     effects: Effects,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Effects {
     fog_color: i32,
     water_color: i32,
@@ -46,25 +47,25 @@ struct Effects {
     music: Option<Music>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Particle {
     options: ParticleOptions,
     probability: f32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct ParticleOptions {
     #[serde(rename = "type")]
     kind: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct AmbientSound {
     sound_id: String,
     range: Option<f32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct MoodSound {
     sound: String,
     tick_delay: i32,
@@ -72,17 +73,18 @@ struct MoodSound {
     offset: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct AdditionsSound {
     sound: String,
     tick_chance: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Music {
     sound: String,
     min_delay: i32,
     max_delay: i32,
+    #[serde(deserialize_with = "deserialize_bool")]
     replace_current_music: i8,
 }
 

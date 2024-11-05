@@ -19,11 +19,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::RegistryItem;
+use super::{deserialize_bool, RegistryItem};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DimensionType {
-    fixed_time: i64,
+    fixed_time: Option<i64>,
     has_skylight: i8,
     has_ceiling: i8,
     ultrawarm: i8,
@@ -39,8 +39,53 @@ pub struct DimensionType {
     ambient_light: f32,
     piglin_safe: i8,
     has_raids: i8,
-    monster_spawn_light_level: i32,
+    monster_spawn_light_level: IntOrLightLevel,
     monster_spawn_block_light_limit: i32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+enum IntOrLightLevel {
+    Int(i32),
+    LL(IntProvider),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+enum IntProvider {
+    #[serde(rename = "minecraft:constant")]
+    Constant { value: i32 },
+    #[serde(rename = "minecraft:uniform")]
+    Uniform {
+        min_inclusive: i32,
+        max_inclusive: i32,
+    },
+    #[serde(rename = "minecraft:biased_to_bottom")]
+    BiasedToBottom {
+        min_inclusive: i32,
+        max_inclusive: i32,
+    },
+    #[serde(rename = "minecraft:clamped")]
+    Clamped {
+        min_inclusive: i32,
+        max_inclusive: i32,
+        source: Box<IntProvider>,
+    },
+    #[serde(rename = "minecraft:clamped_normal")]
+    ClampedNormal {
+        mean: f32,
+        deviation: f32,
+        min_inclusive: i32,
+        max_inclusive: i32,
+    },
+    #[serde(rename = "minecraft:weighted_list")]
+    WeightedList { distribution: Vec<WeightedProvider> },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct WeightedProvider {
+    data: IntProvider,
+    weight: i32,
 }
 
 impl RegistryItem for DimensionType {

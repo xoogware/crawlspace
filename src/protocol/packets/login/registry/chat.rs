@@ -21,13 +21,13 @@ use serde::{Deserialize, Serialize};
 
 use super::RegistryItem;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChatType {
     chat: Decoration,
     narration: Decoration,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Decoration {
     translation_key: String,
     parameters: Vec<String>,

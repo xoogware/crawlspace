@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use super::RegistryItem;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WolfVariant {
     wild_texture: String,
     tame_texture: String,

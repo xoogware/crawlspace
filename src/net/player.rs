@@ -20,6 +20,7 @@
 use std::{sync::Arc, time::Duration};
 
 use color_eyre::eyre::Result;
+use registry::Registry;
 // use registry::Registry;
 use serde_json::json;
 use tokio::{
@@ -205,7 +206,22 @@ impl SharedPlayer {
         // TODO: maybe(?) actually handle this
         io.rx::<KnownPacksS>().await?;
 
-        // let registry = Registry::DEFAULT;
+        let registry = &*registry::ALL_REGISTRIES;
+        io.tx(&Registry::from(registry.trim_material.clone()))
+            .await?;
+        io.tx(&Registry::from(registry.trim_pattern.clone()))
+            .await?;
+        io.tx(&Registry::from(registry.banner_pattern.clone()))
+            .await?;
+        io.tx(&Registry::from(registry.biome.clone())).await?;
+        io.tx(&Registry::from(registry.chat_type.clone())).await?;
+        io.tx(&Registry::from(registry.damage_type.clone())).await?;
+        io.tx(&Registry::from(registry.dimension_type.clone()))
+            .await?;
+        io.tx(&Registry::from(registry.wolf_variant.clone()))
+            .await?;
+        io.tx(&Registry::from(registry.painting_variant.clone()))
+            .await?;
 
         io.tx(&FinishConfigurationC).await?;
         io.rx::<FinishConfigurationAckS>().await?;

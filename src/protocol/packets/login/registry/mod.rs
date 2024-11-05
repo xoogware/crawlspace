@@ -17,8 +17,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use std::{collections::HashMap, sync::LazyLock};
+
 use fastnbt::SerOpts;
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize};
 
 use crate::protocol::{datatypes::VarInt, Encode, Packet};
 
@@ -40,7 +42,7 @@ pub use painting::*;
 pub use trim::*;
 pub use wolf::*;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Registry<T: RegistryItem> {
     registry_id: String,
     entries: Vec<RegistryEntry<T>>,
@@ -53,22 +55,10 @@ where
     const ID: i32 = 0x07;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RegistryEntry<T: RegistryItem> {
     id: String,
     entry: Option<T>,
-}
-
-impl<T> Registry<T>
-where
-    T: RegistryItem,
-{
-    pub fn new(id: &str, entries: Vec<RegistryEntry<T>>) -> Self {
-        Self {
-            registry_id: id.to_owned(),
-            entries,
-        }
-    }
 }
 
 impl<T> Encode for Registry<T>
@@ -95,7 +85,7 @@ where
 }
 
 // TODO: maybe fill these in? for now we're only using dimensiontype so we can spawn in the end lol
-pub trait RegistryItem: Serialize + Sized {
+pub trait RegistryItem: Serialize + Sized + Clone {
     const ID: &str;
 
     fn encode(&self, w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
@@ -103,31 +93,65 @@ pub trait RegistryItem: Serialize + Sized {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AllRegistries {
     #[serde(rename = "minecraft:trim_material")]
-    trim_material: Registry<TrimMaterial>,
+    pub trim_material: HashMap<String, TrimMaterial>,
     #[serde(rename = "minecraft:trim_pattern")]
-    trim_pattern: Registry<TrimPattern>,
+    pub trim_pattern: HashMap<String, TrimPattern>,
     #[serde(rename = "minecraft:banner_pattern")]
-    banner_pattern: Registry<BannerPattern>,
+    pub banner_pattern: HashMap<String, BannerPattern>,
     #[serde(rename = "minecraft:worldgen/biome")]
-    biome: Registry<Biome>,
+    pub biome: HashMap<String, Biome>,
     #[serde(rename = "minecraft:chat_type")]
-    chat_type: Registry<ChatType>,
+    pub chat_type: HashMap<String, ChatType>,
     #[serde(rename = "minecraft:damage_type")]
-    damage_type: Registry<DamageType>,
+    pub damage_type: HashMap<String, DamageType>,
     #[serde(rename = "minecraft:dimension_type")]
-    dimension_type: Registry<DimensionType>,
+    pub dimension_type: HashMap<String, DimensionType>,
     #[serde(rename = "minecraft:wolf_variant")]
-    wolf_variant: Registry<WolfVariant>,
+    pub wolf_variant: HashMap<String, WolfVariant>,
     #[serde(rename = "minecraft:painting_variant")]
-    painting_variant: Registry<PaintingVariant>,
+    pub painting_variant: HashMap<String, PaintingVariant>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+impl<T: RegistryItem> From<HashMap<String, T>> for Registry<T> {
+    fn from(value: HashMap<String, T>) -> Self {
+        let entries = value
+            .into_iter()
+            .map(|(k, v)| RegistryEntry {
+                id: k,
+                entry: Some(v),
+            })
+            .collect();
+
+        Self {
+            registry_id: T::ID.to_owned(),
+            entries,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 enum StringOrCompound<T> {
     String(String),
     Compound(T),
+}
+
+pub static ALL_REGISTRIES: LazyLock<AllRegistries> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../../../../assets/registries.json"))
+        .expect("registries.json should be parseable")
+});
+
+fn deserialize_bool<'de, D>(deserializer: D) -> Result<i8, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    let b: bool = de::Deserialize::deserialize(deserializer)?;
+
+    match b {
+        true => Ok(1),
+        false => Ok(0),
+    }
 }

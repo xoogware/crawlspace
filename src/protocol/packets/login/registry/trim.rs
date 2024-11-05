@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{RegistryItem, StringOrCompound};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TrimMaterial {
     asset_name: String,
     ingredient: String,
@@ -29,9 +29,11 @@ pub struct TrimMaterial {
     description: StringOrCompound<TrimDescription>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+// FIXME: bare minimum. should probably properly implement
+// https://wiki.vg/Text_formatting soon
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct TrimDescription {
-    color: String,
+    color: Option<String>,
     translate: String,
 }
 
@@ -39,12 +41,11 @@ impl RegistryItem for TrimMaterial {
     const ID: &str = "minecraft:trim_material";
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TrimPattern {
     asset_id: String,
     template_item: String,
     description: TrimDescription,
-    decal: i8,
 }
 
 impl RegistryItem for TrimPattern {
