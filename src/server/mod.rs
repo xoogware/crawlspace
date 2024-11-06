@@ -25,10 +25,7 @@ use std::sync::Arc;
 
 use world::World;
 
-use crate::{
-    net::player::{Player, SharedPlayer},
-    CrawlState,
-};
+use crate::{net::player::SharedPlayer, CrawlState};
 
 use self::ticker::Ticker;
 
@@ -36,7 +33,7 @@ use self::ticker::Ticker;
 pub struct Server {
     pub ticker: Ticker,
 
-    _world: Option<Arc<World>>,
+    world: Option<Arc<World>>,
     players: Vec<SharedPlayer>,
 
     crawlstate: CrawlState,
@@ -47,7 +44,7 @@ impl Server {
     pub fn new(state: CrawlState, tick_rate: u8) -> Self {
         Server {
             ticker: Ticker::new(tick_rate),
-            _world: None,
+            world: None,
             players: Vec::new(),
             crawlstate: state,
         }
@@ -61,9 +58,5 @@ impl Server {
         while let Ok(p) = player_recv.try_recv() {
             self.players.push(p);
         }
-
-        self.players
-            .iter()
-            .for_each(|p| trace!("Ticking {}", p.id()));
     }
 }

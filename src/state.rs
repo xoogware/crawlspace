@@ -21,7 +21,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 
 use tokio::sync::{mpsc, Mutex, Semaphore};
 
-use crate::net::player::{Player, SharedPlayer};
+use crate::net::player::SharedPlayer;
 
 #[derive(Debug)]
 pub struct State {

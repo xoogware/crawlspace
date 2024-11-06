@@ -70,6 +70,14 @@ impl Encoder {
     {
         let initial_len = self.buf.len();
         packet.encode_packet((&mut self.buf).writer())?;
+        trace!(
+            "after appending: {:#?}",
+            (&self.buf as &[u8])
+                .iter()
+                .map(|a| a.to_string())
+                .collect::<Vec<String>>()
+                .join(" ")
+        );
 
         let packet_size = self.buf.len() - initial_len;
 

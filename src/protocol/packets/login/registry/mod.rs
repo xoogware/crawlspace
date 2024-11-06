@@ -42,6 +42,11 @@ pub use painting::*;
 pub use trim::*;
 pub use wolf::*;
 
+pub static ALL_REGISTRIES: LazyLock<AllRegistries> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../../../../assets/registries.json"))
+        .expect("registries.json should be parseable")
+});
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Registry<T: RegistryItem> {
     registry_id: String,
@@ -138,11 +143,6 @@ enum StringOrCompound<T> {
     String(String),
     Compound(T),
 }
-
-pub static ALL_REGISTRIES: LazyLock<AllRegistries> = LazyLock::new(|| {
-    serde_json::from_str(include_str!("../../../../../assets/registries.json"))
-        .expect("registries.json should be parseable")
-});
 
 fn deserialize_bool<'de, D>(deserializer: D) -> Result<i8, D::Error>
 where

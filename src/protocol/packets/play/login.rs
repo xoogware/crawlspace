@@ -74,6 +74,17 @@ impl From<Gamemode> for u8 {
     }
 }
 
+impl From<Gamemode> for i8 {
+    fn from(value: Gamemode) -> Self {
+        match value {
+            Gamemode::Survival => 0,
+            Gamemode::Creative => 1,
+            Gamemode::Adventure => 2,
+            Gamemode::Spectator => 3,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct DeathLocation<'a> {
     dimension_name: Bounded<&'a str>,
@@ -103,7 +114,7 @@ impl<'a> Encode for LoginPlayC<'a> {
 
         match self.previous_gamemode {
             None => (-1).encode(&mut w)?,
-            Some(g) => u8::from(g).encode(&mut w)?,
+            Some(g) => i8::from(g).encode(&mut w)?,
         }
 
         self.is_debug.encode(&mut w)?;

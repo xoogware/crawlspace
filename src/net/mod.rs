@@ -17,14 +17,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::time::Duration;
 
 use color_eyre::eyre::Result;
 use player::SharedPlayer;
-use tokio::{
-    net::{TcpListener, UdpSocket},
-    time,
-};
+use tokio::net::TcpListener;
 
 mod io;
 pub mod player;

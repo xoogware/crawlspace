@@ -47,7 +47,6 @@ impl Ticker {
             }
 
             self.last_tick = now;
-            trace!("{}ms elapsed, ticking full server", elapsed.as_millis(),);
             server.tick().await;
         }
     }

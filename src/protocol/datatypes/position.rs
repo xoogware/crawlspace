@@ -17,11 +17,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::error::Error;
 
 use bitfield_struct::bitfield;
 use byteorder::{BigEndian, WriteBytesExt};
-use color_eyre::eyre::{bail, Result};
+use color_eyre::eyre::Result;
 use thiserror::Error;
 
 use crate::protocol::Encode;
