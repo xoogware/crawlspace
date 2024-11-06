@@ -20,6 +20,7 @@
 use std::sync::{atomic::AtomicUsize, Arc};
 
 use tokio::sync::{mpsc, Mutex, Semaphore};
+use tokio_util::sync::CancellationToken;
 
 use crate::net::player::SharedPlayer;
 
@@ -35,8 +36,7 @@ pub struct State {
     pub player_send: mpsc::Sender<SharedPlayer>,
     pub player_recv: Mutex<mpsc::Receiver<SharedPlayer>>,
 
-    pub shutdown_send: mpsc::UnboundedSender<()>,
-    pub shutdown_recv: Mutex<mpsc::UnboundedReceiver<()>>,
+    pub shutdown_token: CancellationToken,
 
     pub net_sema: Arc<Semaphore>,
 }
@@ -57,7 +57,7 @@ impl State {
         }
 
         let (player_send, player_recv) = mpsc::channel(16);
-        let (shutdown_send, shutdown_recv) = mpsc::unbounded_channel();
+        let shutdown_token = CancellationToken::new();
 
         Self {
             max_players: max,
@@ -70,8 +70,7 @@ impl State {
             player_send,
             player_recv: Mutex::new(player_recv),
 
-            shutdown_send,
-            shutdown_recv: Mutex::new(shutdown_recv),
+            shutdown_token,
 
             net_sema: Arc::new(Semaphore::new(max)),
         }

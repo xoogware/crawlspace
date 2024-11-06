@@ -29,15 +29,19 @@ use tokio::{
     sync::{Mutex, OwnedSemaphorePermit, RwLock},
     time::{self, timeout},
 };
+use uuid::Uuid;
 
 use crate::{
     protocol::{
         datatypes::{Bounded, VarInt},
         packets::{
             login::*,
-            play::{ConfirmTeleportS, Gamemode, LoginPlayC, SynchronisePositionC},
+            play::{
+                ConfirmTeleportS, Gamemode, LoginPlayC, PlayerInfoUpdateC, PlayerStatus,
+                SynchronisePositionC,
+            },
         },
-        PacketState,
+        PacketState, Property,
     },
     CrawlState,
 };
@@ -56,6 +60,7 @@ pub struct Player {
     crawlstate: CrawlState,
     packet_state: RwLock<PacketState>,
 
+    uuid: RwLock<Option<Uuid>>,
     tp_state: Mutex<TeleportState>,
 }
 
@@ -80,6 +85,7 @@ impl SharedPlayer {
             id,
             io: Mutex::new(NetIo::new(connection)),
             _permit: permit,
+            uuid: RwLock::new(None),
 
             crawlstate,
             packet_state: RwLock::new(PacketState::Handshaking),
@@ -142,11 +148,16 @@ impl SharedPlayer {
         let next_state = p.next_state;
         drop(io);
 
+        let mut s = self.0.packet_state.write().await;
         match next_state {
             PacketState::Status => {
+                *s = PacketState::Status;
+                drop(s);
                 self.handle_status().await?;
             }
             PacketState::Login => {
+                *s = PacketState::Login;
+                drop(s);
                 self.login().await?;
             }
             s => unimplemented!("state {:#?} unimplemented after handshake", s),
@@ -207,6 +218,11 @@ impl SharedPlayer {
             properties: Vec::new(),
             strict_error_handling: false,
         };
+
+        {
+            let mut own_uuid = self.0.uuid.write().await;
+            *own_uuid = Some(uuid);
+        }
 
         io.tx(&success).await?;
         io.rx::<LoginAckS>().await?;
@@ -303,17 +319,29 @@ impl SharedPlayer {
                 Err(why)?;
             }
             Err(why) => {
-                warn!("Spawning player {} failed: {why}", self.0.id);
+                warn!("Spawning player {} timed out: {why}", self.0.id);
                 Err(why)?;
             }
         }
+
+        let player_add = PlayerInfoUpdateC {
+            players: &[PlayerStatus::for_player(self.uuid().await).add_player("AFK", &[])],
+        };
+        io.tx(&player_add).await?;
 
         // FIXME: GROSS LOL?????? this should(?) change ownership of the player to the server
         // thread but realistically who knows burhhhh
         state.player_send.send(self.clone()).await?;
 
         loop {
-            self.handle_packets().await?;
+            tokio::select! {
+                _ = self.handle_packets() => {
+                    time::sleep(Duration::from_millis(50)).await;
+                }
+                _ = state.shutdown_token.cancelled() => {
+                    return Ok(());
+                }
+            }
         }
     }
 
@@ -330,6 +358,11 @@ impl SharedPlayer {
                 false => Err(TeleportError::WrongId(expected, id)),
             },
         }
+    }
+
+    async fn uuid(&self) -> Uuid {
+        let uuid = self.0.uuid.read().await;
+        uuid.expect("uuid() called on uninitialized player - only call this after login!")
     }
 }
 

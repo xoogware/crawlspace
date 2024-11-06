@@ -47,9 +47,11 @@ pub mod packets {
 
     pub mod play {
         mod login;
+        mod status;
         mod teleport;
 
         pub use login::*;
+        pub use status::*;
         pub use teleport::*;
     }
 }
@@ -60,7 +62,7 @@ mod encoder;
 use std::{fmt::Debug, io::Write};
 
 use color_eyre::eyre::{Context, Result};
-use datatypes::VarInt;
+use datatypes::{Bounded, VarInt};
 pub use decoder::*;
 pub use encoder::*;
 use thiserror::Error;
@@ -127,3 +129,23 @@ pub trait ClientboundPacket: Packet + Encode + Debug {
     }
 }
 impl<P> ClientboundPacket for P where P: Packet + Encode + Debug {}
+
+#[derive(Debug)]
+pub struct Property<'a> {
+    name: Bounded<&'a str, 32767>,
+    value: Bounded<&'a str, 32767>,
+    signature: Option<Bounded<&'a str, 32767>>,
+}
+
+impl Encode for Property<'_> {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        let signed = self.signature.is_some();
+
+        self.name.encode(&mut w)?;
+        self.value.encode(&mut w)?;
+        signed.encode(&mut w)?;
+        self.signature.encode(&mut w)?;
+
+        Ok(())
+    }
+}

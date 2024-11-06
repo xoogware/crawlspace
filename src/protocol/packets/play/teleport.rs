@@ -19,12 +19,7 @@
 
 use std::sync::atomic::{AtomicI32, Ordering};
 
-use rand::Rng;
-
-use crate::protocol::{
-    datatypes::{Bounded, Position, VarInt},
-    Decode, Encode, Packet,
-};
+use crate::protocol::{datatypes::VarInt, Decode, Encode, Packet};
 
 static TP_ID: AtomicI32 = AtomicI32::new(0);
 

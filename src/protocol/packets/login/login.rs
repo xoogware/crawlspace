@@ -17,12 +17,12 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-
 use color_eyre::eyre::Result;
 use uuid::Uuid;
 
 use crate::protocol::{
-    datatypes::{Bounded, Bytes, VarInt}, Decode, Encode, Packet,
+    datatypes::{Bounded, Bytes, VarInt},
+    Decode, Encode, Packet, Property,
 };
 
 #[derive(Debug)]
@@ -50,26 +50,6 @@ pub struct LoginSuccessC<'a> {
     pub username: Bounded<&'a str, 16>,
     pub properties: Vec<Property<'a>>,
     pub strict_error_handling: bool,
-}
-
-#[derive(Debug)]
-pub struct Property<'a> {
-    name: Bounded<&'a str, 32767>,
-    value: Bounded<&'a str, 32767>,
-    signature: Option<Bounded<&'a str, 32767>>,
-}
-
-impl Encode for Property<'_> {
-    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
-        let signed = self.signature.is_some();
-
-        self.name.encode(&mut w)?;
-        self.value.encode(&mut w)?;
-        signed.encode(&mut w)?;
-        self.signature.encode(&mut w)?;
-
-        Ok(())
-    }
 }
 
 impl Packet for LoginSuccessC<'_> {

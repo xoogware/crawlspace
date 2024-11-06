@@ -17,10 +17,14 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::sync::Arc;
+use std::{
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
 
 use color_eyre::eyre::Result;
 use server::Server;
+use tokio_util::sync::CancellationToken;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[macro_use]
@@ -80,6 +84,7 @@ async fn main() -> Result<()> {
 
     // TODO: more graceful shutdown?
     tokio::signal::ctrl_c().await?;
+    state.shutdown_token.cancel();
 
     Ok(())
 }
