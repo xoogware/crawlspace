@@ -46,10 +46,12 @@ pub mod packets {
     }
 
     pub mod play {
+        mod game_event;
         mod login;
         mod status;
         mod teleport;
 
+        pub use game_event::*;
         pub use login::*;
         pub use status::*;
         pub use teleport::*;

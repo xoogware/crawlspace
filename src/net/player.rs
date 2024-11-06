@@ -37,8 +37,8 @@ use crate::{
         packets::{
             login::*,
             play::{
-                ConfirmTeleportS, Gamemode, LoginPlayC, PlayerInfoUpdateC, PlayerStatus,
-                SynchronisePositionC,
+                ConfirmTeleportS, GameEvent, GameEventC, Gamemode, LoginPlayC, PlayerInfoUpdateC,
+                PlayerStatus, SynchronisePositionC,
             },
         },
         PacketState, Property,
@@ -328,6 +328,9 @@ impl SharedPlayer {
             players: &[PlayerStatus::for_player(self.uuid().await).add_player("AFK", &[])],
         };
         io.tx(&player_add).await?;
+
+        let await_chunks = GameEventC::from(GameEvent::StartWaitingForLevelChunks);
+        io.tx(&await_chunks).await?;
 
         // FIXME: GROSS LOL?????? this should(?) change ownership of the player to the server
         // thread but realistically who knows burhhhh
