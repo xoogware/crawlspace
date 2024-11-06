@@ -47,8 +47,10 @@ pub mod packets {
 
     pub mod play {
         mod login;
+        mod teleport;
 
         pub use login::*;
+        pub use teleport::*;
     }
 }
 

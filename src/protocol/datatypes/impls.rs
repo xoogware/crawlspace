@@ -82,6 +82,18 @@ impl Encode for u128 {
     }
 }
 
+impl Encode for f32 {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        Ok(w.write_f32::<BigEndian>(*self)?)
+    }
+}
+
+impl Encode for f64 {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        Ok(w.write_f64::<BigEndian>(*self)?)
+    }
+}
+
 impl Encode for Uuid {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         self.as_u128().encode(&mut w)

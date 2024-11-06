@@ -23,10 +23,11 @@ use color_eyre::eyre::Result;
 use registry::Registry;
 // use registry::Registry;
 use serde_json::json;
+use thiserror::Error;
 use tokio::{
     net::TcpStream,
     sync::{Mutex, OwnedSemaphorePermit, RwLock},
-    time::timeout,
+    time::{self, timeout},
 };
 
 use crate::{
@@ -34,7 +35,7 @@ use crate::{
         datatypes::{Bounded, VarInt},
         packets::{
             login::*,
-            play::{Gamemode, LoginPlayC},
+            play::{ConfirmTeleportS, Gamemode, LoginPlayC, SynchronisePositionC},
         },
         PacketState,
     },
@@ -54,6 +55,14 @@ pub struct Player {
 
     crawlstate: CrawlState,
     packet_state: RwLock<PacketState>,
+
+    tp_state: Mutex<TeleportState>,
+}
+
+#[derive(Debug)]
+enum TeleportState {
+    Pending(i32, time::Instant),
+    Clear,
 }
 
 #[derive(Clone, Debug)]
@@ -74,6 +83,8 @@ impl SharedPlayer {
 
             crawlstate,
             packet_state: RwLock::new(PacketState::Handshaking),
+
+            tp_state: Mutex::new(TeleportState::Clear),
         }))
     }
 
@@ -229,6 +240,19 @@ impl SharedPlayer {
         Ok(())
     }
 
+    #[cfg(feature = "encryption")]
+    async fn login_velocity(&mut self, _username: &str) -> Result<()> {
+        let req = PluginRequestC {
+            message_id: VarInt(0),
+            channel: Bounded("velocity:player_info"),
+            data: Bounded(Bytes(&[3])),
+        };
+
+        self.io.tx(&req).await?;
+
+        Ok(())
+    }
+
     async fn begin_play(&self) -> Result<()> {
         let mut packet_state = self.0.packet_state.write().await;
         *packet_state = PacketState::Play;
@@ -262,23 +286,57 @@ impl SharedPlayer {
 
         io.tx(&login).await?;
 
+        let tp = SynchronisePositionC::new(0.0, 10.0, 0.0, 0.0, 0.0);
+        {
+            let mut tp_state = self.0.tp_state.lock().await;
+            // player will be given 5 (FIVE) SECONDS TO ACK!!!!!
+            *tp_state = TeleportState::Pending(tp.id, time::Instant::now());
+        }
+        io.tx(&tp).await?;
+
+        let tp_ack = io.rx::<ConfirmTeleportS>().await?;
+
+        match tokio::time::timeout(Duration::from_secs(5), self.confirm_teleport(tp_ack.id)).await {
+            Ok(Ok(())) => (),
+            Ok(Err(why)) => {
+                warn!("Spawning player {} failed: {why}", self.0.id);
+                Err(why)?;
+            }
+            Err(why) => {
+                warn!("Spawning player {} failed: {why}", self.0.id);
+                Err(why)?;
+            }
+        }
+
         // FIXME: GROSS LOL?????? this should(?) change ownership of the player to the server
         // thread but realistically who knows burhhhh
         state.player_send.send(self.clone()).await?;
 
+        loop {
+            self.handle_packets().await?;
+        }
+    }
+
+    async fn handle_packets(&self) -> Result<()> {
         Ok(())
     }
 
-    #[cfg(feature = "encryption")]
-    async fn login_velocity(&mut self, _username: &str) -> Result<()> {
-        let req = PluginRequestC {
-            message_id: VarInt(0),
-            channel: Bounded("velocity:player_info"),
-            data: Bounded(Bytes(&[3])),
-        };
-
-        self.io.tx(&req).await?;
-
-        Ok(())
+    async fn confirm_teleport(&self, id: i32) -> Result<(), TeleportError> {
+        let tp_state = self.0.tp_state.lock().await;
+        match *tp_state {
+            TeleportState::Clear => Err(TeleportError::Unexpected),
+            TeleportState::Pending(expected, _) => match id == expected {
+                true => Ok(()),
+                false => Err(TeleportError::WrongId(expected, id)),
+            },
+        }
     }
+}
+
+#[derive(Debug, Error)]
+enum TeleportError {
+    #[error("Client was not expecting a teleport acknowledgement")]
+    Unexpected,
+    #[error("Teleport ack has wrong ID (expected {0}, got {1})")]
+    WrongId(i32, i32),
 }
