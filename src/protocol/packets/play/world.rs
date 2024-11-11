@@ -192,18 +192,22 @@ impl Encode for ChunkDataUpdateLightC<'_> {
 impl ChunkSection {
     fn anvil_to_sec(value: &world::Section) -> Self {
         let mut blocks: [i16; 16 * 16 * 16] = [0; 16 * 16 * 16];
-        let bit_length = 64 - (value.block_states.palette.len() as u64).leading_zeros();
-        let bit_length = bit_length.max(4);
+        let bit_length = (64
+            - (value.block_states.palette.len() as u64)
+                .leading_zeros())
+                .max(4);
+        let blocks_per_long = 64 / bit_length;
+
+        let bit_mask = (1 << bit_length) - 1;
 
         match value.block_states.data {
             None => blocks.fill(0),
             Some(ref data) => {
                 let mut i = 0;
                 for long in data.iter() {
-                    let mut long = *long as u64;
-                    while long != 0 {
-                        blocks[i] = (long & ((1 << bit_length) - 1)) as i16;
-                        long >>= bit_length;
+                    let long = *long as u64;
+                    for b in 0..blocks_per_long {
+                        blocks[i] = ((long >> (bit_length * b)) & bit_mask) as i16;
                         i += 1;
                     }
                 }
@@ -233,13 +237,13 @@ impl ChunkSection {
         let mut blocks_so_far = 0;
         let mut long_index = 0;
 
-        for (index, block) in blocks.iter().enumerate() {
+        for block in blocks {
             if blocks_so_far == blocks_per_long {
                 blocks_so_far = 0;
                 long_index += 1;
             }
 
-            let block = *block as i64;
+            let block = block as i64;
 
             data[long_index] |= block << (blocks_so_far * bit_length);
             blocks_so_far += 1;

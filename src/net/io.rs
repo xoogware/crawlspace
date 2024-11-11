@@ -119,15 +119,7 @@ impl NetIo {
         trace!("Sending packet {:?}", packet);
         self.encoder.append_packet(packet)?;
         let bytes = self.encoder.take();
-        trace!(
-            "sending raw bytes: {:?}",
-            bytes
-                .to_vec()
-                .iter()
-                .map(|b| b.to_string())
-                .collect::<Vec<_>>()
-                .join(" ")
-        );
+        trace!("raw packet is {} bytes", bytes.len());
         Ok(self.stream.write_all(&bytes).await?)
     }
 

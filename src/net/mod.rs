@@ -28,6 +28,9 @@ use crate::CrawlState;
 
 #[cfg(feature = "lan")]
 pub async fn spawn_lan_broadcast(state: CrawlState) -> Result<()> {
+    use std::time::Duration;
+    use tokio::{net::UdpSocket, time};
+
     let port = state.port;
     let sock = UdpSocket::bind("0.0.0.0:9753").await?;
 
