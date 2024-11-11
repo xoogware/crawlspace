@@ -20,6 +20,7 @@
 use std::{sync::Arc, time::Duration};
 
 use color_eyre::eyre::Result;
+use rand::Rng;
 use registry::Registry;
 // use registry::Registry;
 use serde_json::json;
@@ -37,8 +38,9 @@ use crate::{
         packets::{
             login::*,
             play::{
-                ConfirmTeleportS, GameEvent, GameEventC, Gamemode, LoginPlayC, PlayerInfoUpdateC,
-                PlayerStatus, SynchronisePositionC,
+                ChunkDataUpdateLightC, ConfirmTeleportS, GameEvent, GameEventC, Gamemode,
+                KeepAliveC, LoginPlayC, PlayerInfoUpdateC, PlayerStatus, SetCenterChunkC,
+                SynchronisePositionC,
             },
         },
         PacketState, Property,
@@ -55,13 +57,16 @@ use super::io::NetIo;
 pub struct Player {
     pub id: u16,
     _permit: OwnedSemaphorePermit,
-    io: Mutex<NetIo>,
+    pub io: Mutex<NetIo>,
 
     crawlstate: CrawlState,
     packet_state: RwLock<PacketState>,
 
     uuid: RwLock<Option<Uuid>>,
     tp_state: Mutex<TeleportState>,
+
+    // FIXME: uh
+    the_end_id: Mutex<i32>,
 }
 
 #[derive(Debug)]
@@ -71,7 +76,7 @@ enum TeleportState {
 }
 
 #[derive(Clone, Debug)]
-pub struct SharedPlayer(Arc<Player>);
+pub struct SharedPlayer(pub Arc<Player>);
 
 impl SharedPlayer {
     #[must_use]
@@ -91,6 +96,8 @@ impl SharedPlayer {
             packet_state: RwLock::new(PacketState::Handshaking),
 
             tp_state: Mutex::new(TeleportState::Clear),
+
+            the_end_id: Mutex::new(0),
         }))
     }
 
@@ -234,6 +241,7 @@ impl SharedPlayer {
         io.rx::<KnownPacksS>().await?;
 
         let registry = &*registry::ALL_REGISTRIES;
+        let dimensions = Registry::from(registry.dimension_type.clone());
         io.tx(&Registry::from(registry.trim_material.clone()))
             .await?;
         io.tx(&Registry::from(registry.trim_pattern.clone()))
@@ -243,12 +251,17 @@ impl SharedPlayer {
         io.tx(&Registry::from(registry.biome.clone())).await?;
         io.tx(&Registry::from(registry.chat_type.clone())).await?;
         io.tx(&Registry::from(registry.damage_type.clone())).await?;
-        io.tx(&Registry::from(registry.dimension_type.clone()))
+        io.tx(&dimensions)
             .await?;
         io.tx(&Registry::from(registry.wolf_variant.clone()))
             .await?;
         io.tx(&Registry::from(registry.painting_variant.clone()))
             .await?;
+
+        {
+            let mut the_end_id = self.0.the_end_id.lock().await;
+            *the_end_id = dimensions.index_of("minecraft:the_end");
+        }
 
         io.tx(&FinishConfigurationC).await?;
         io.rx::<FinishConfigurationAckS>().await?;
@@ -278,6 +291,11 @@ impl SharedPlayer {
 
         let max_players: i32 = state.max_players.try_into().unwrap_or(50);
 
+        let the_end_id = {
+            let the_end_id = self.0.the_end_id.lock().await;
+            *the_end_id
+        };
+
         let login = LoginPlayC {
             entity_id: self.0.id as i32,
             is_hardcore: false,
@@ -288,10 +306,10 @@ impl SharedPlayer {
             reduced_debug_info: !cfg!(debug_assertions),
             enable_respawn_screen: false,
             do_limited_crafting: false,
-            dimension_type: VarInt(2),
+            dimension_type: VarInt(the_end_id),
             dimension_name: Bounded::<&'static str>("minecraft:the_end"),
             hashed_seed: 0,
-            gamemode: Gamemode::Adventure,
+            gamemode: Gamemode::Creative,
             previous_gamemode: Some(Gamemode::Adventure),
             is_debug: false,
             is_superflat: false,
@@ -302,7 +320,93 @@ impl SharedPlayer {
 
         io.tx(&login).await?;
 
-        let tp = SynchronisePositionC::new(0.0, 10.0, 0.0, 0.0, 0.0);
+        drop(io);
+
+        self.teleport_awaiting(0.0, 100.0, 0.0, 0.0, 0.0).await?;
+
+        let player_add = PlayerInfoUpdateC {
+            players: &[PlayerStatus::for_player(self.uuid().await).add_player("AFK", &[])],
+        };
+
+        let mut io = self.0.io.lock().await;
+        io.tx(&player_add).await?;
+
+        let await_chunks = GameEventC::from(GameEvent::StartWaitingForLevelChunks);
+        io.tx(&await_chunks).await?;
+
+        let set_center = SetCenterChunkC {
+            x: VarInt(0),
+            y: VarInt(0),
+        };
+        io.tx(&set_center).await?;
+        drop(io);
+
+        // FIXME: GROSS LOL?????? this should(?) change ownership of the player to the server
+        // thread but realistically who knows burhhhh
+        state.player_send.send(self.clone()).await?;
+
+        loop {
+            tokio::select! {
+                _ = self.keepalive() => {
+                    // keepalive needs to be sent every ~15 sec after keepalive response
+                    time::sleep(Duration::from_secs(12)).await;
+                }
+                _ = state.shutdown_token.cancelled() => {
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    async fn keepalive(&self) -> Result<()> {
+        let id = {
+            let mut rng = rand::thread_rng();
+            rng.gen()
+        };
+
+        // if this times out then the player just hasn't requested ping yet lol
+        match timeout(Duration::from_secs(1), self.ping(id)).await {
+            Ok(Ok(())) | Err(_) => Ok(()),
+            Ok(Err(why)) => Err(why),
+        }
+    }
+
+    async fn ping(&self, id: i64) -> Result<()> {
+        let mut io = self.0.io.lock().await;
+        io.flush().await?;
+        let ka = KeepAliveC(id);
+        io.tx(&ka).await?;
+        // TODO: check return keepalive, kick
+        Ok(())
+    }
+
+    async fn confirm_teleport(&self, id: i32) -> Result<(), TeleportError> {
+        let tp_state = self.0.tp_state.lock().await;
+        match *tp_state {
+            TeleportState::Clear => Err(TeleportError::Unexpected),
+            TeleportState::Pending(expected, _) => match id == expected {
+                true => Ok(()),
+                false => Err(TeleportError::WrongId(expected, id)),
+            },
+        }
+    }
+
+    pub async fn uuid(&self) -> Uuid {
+        let uuid = self.0.uuid.read().await;
+        uuid.expect("uuid() called on uninitialized player - only call this after login!")
+    }
+
+    pub async fn teleport_awaiting(
+        &self,
+        x: f64,
+        y: f64,
+        z: f64,
+        yaw: f32,
+        pitch: f32,
+    ) -> Result<()> {
+        let mut io = self.0.io.lock().await;
+
+        let tp = SynchronisePositionC::new(x, y, z, yaw, pitch);
         {
             let mut tp_state = self.0.tp_state.lock().await;
             // player will be given 5 (FIVE) SECONDS TO ACK!!!!!
@@ -323,49 +427,7 @@ impl SharedPlayer {
                 Err(why)?;
             }
         }
-
-        let player_add = PlayerInfoUpdateC {
-            players: &[PlayerStatus::for_player(self.uuid().await).add_player("AFK", &[])],
-        };
-        io.tx(&player_add).await?;
-
-        let await_chunks = GameEventC::from(GameEvent::StartWaitingForLevelChunks);
-        io.tx(&await_chunks).await?;
-
-        // FIXME: GROSS LOL?????? this should(?) change ownership of the player to the server
-        // thread but realistically who knows burhhhh
-        state.player_send.send(self.clone()).await?;
-
-        loop {
-            tokio::select! {
-                _ = self.handle_packets() => {
-                    time::sleep(Duration::from_millis(50)).await;
-                }
-                _ = state.shutdown_token.cancelled() => {
-                    return Ok(());
-                }
-            }
-        }
-    }
-
-    async fn handle_packets(&self) -> Result<()> {
         Ok(())
-    }
-
-    async fn confirm_teleport(&self, id: i32) -> Result<(), TeleportError> {
-        let tp_state = self.0.tp_state.lock().await;
-        match *tp_state {
-            TeleportState::Clear => Err(TeleportError::Unexpected),
-            TeleportState::Pending(expected, _) => match id == expected {
-                true => Ok(()),
-                false => Err(TeleportError::WrongId(expected, id)),
-            },
-        }
-    }
-
-    async fn uuid(&self) -> Uuid {
-        let uuid = self.0.uuid.read().await;
-        uuid.expect("uuid() called on uninitialized player - only call this after login!")
     }
 }
 

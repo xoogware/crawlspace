@@ -89,7 +89,7 @@ impl NetIo {
 
                     self.frame = frame;
                     let r = self.frame.decode()?;
-                    debug!("Got packet {:#?}", r);
+                    debug!("Got packet {:?}", r);
                     return Ok(r);
                 };
 
@@ -116,9 +116,23 @@ impl NetIo {
     where
         P: ClientboundPacket,
     {
-        debug!("Sending packet {:#?}", packet);
+        trace!("Sending packet {:?}", packet);
         self.encoder.append_packet(packet)?;
         let bytes = self.encoder.take();
+        trace!(
+            "sending raw bytes: {:?}",
+            bytes
+                .to_vec()
+                .iter()
+                .map(|b| b.to_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
         Ok(self.stream.write_all(&bytes).await?)
+    }
+
+    pub async fn flush(&mut self) -> Result<()> {
+        self.stream.flush().await?;
+        Ok(())
     }
 }

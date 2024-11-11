@@ -18,14 +18,15 @@
  */
 
 use std::{
+    fs::OpenOptions,
     sync::{Arc, LazyLock},
     time::Duration,
 };
 
 use color_eyre::eyre::Result;
 use server::Server;
-use tokio_util::sync::CancellationToken;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{layer::SubscriberExt, prelude::*, EnvFilter};
+use world::{blocks::ALL_BLOCKS, read_world};
 
 #[macro_use]
 extern crate tracing;
@@ -34,6 +35,7 @@ mod net;
 mod protocol;
 mod server;
 mod state;
+mod world;
 
 const VERSION: &str = "1.21.1";
 const VERSION_NUM: i32 = 767;
@@ -52,10 +54,28 @@ async fn main() -> Result<()> {
         true => {
             let filter = EnvFilter::from_default_env();
             let fmt = tracing_subscriber::fmt::layer().pretty();
-            tracing_subscriber::registry().with(filter).with(fmt).init();
+            let file = OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open("log")
+                .unwrap();
+            tracing_subscriber::registry()
+                .with(filter)
+                .with(fmt)
+                .with(tracing_subscriber::fmt::layer().with_writer(file))
+                .init();
         }
         false => tracing_subscriber::fmt::init(),
     }
+
+    info!("Loading world");
+    let world = read_world("./tmp/DIM1/region")?;
+    info!("Done.");
+
+    info!("Loading blocks");
+    let _ = *ALL_BLOCKS;
+    info!("Done.");
 
     let port = std::env::var("PORT")
         .ok()
@@ -75,7 +95,7 @@ async fn main() -> Result<()> {
 
     net::spawn_net_handler(state.clone()).await?;
 
-    let server = Server::new(state.clone(), TICK_RATE);
+    let server = Server::new(state.clone(), world, TICK_RATE);
 
     {
         let mut ticker = server.ticker;

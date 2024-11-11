@@ -47,14 +47,18 @@ pub mod packets {
 
     pub mod play {
         mod game_event;
+        mod keepalive;
         mod login;
         mod status;
         mod teleport;
+        mod world;
 
         pub use game_event::*;
+        pub use keepalive::*;
         pub use login::*;
         pub use status::*;
         pub use teleport::*;
+        pub use world::*;
     }
 }
 
@@ -63,6 +67,7 @@ mod encoder;
 
 use std::{fmt::Debug, io::Write};
 
+use bit_vec::BitVec;
 use color_eyre::eyre::{Context, Result};
 use datatypes::{Bounded, VarInt};
 pub use decoder::*;
@@ -75,8 +80,10 @@ pub trait Encode {
     fn encode(&self, w: impl Write) -> Result<()>;
 }
 
-pub trait Decode<'a>: Sized {
-    fn decode(r: &mut &'a [u8]) -> Result<Self>;
+pub trait Decode<'a> {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>
+    where
+        Self: Sized;
 }
 
 pub trait DecodeSized<'a>: Sized {
@@ -147,6 +154,24 @@ impl Encode for Property<'_> {
         self.value.encode(&mut w)?;
         signed.encode(&mut w)?;
         self.signature.encode(&mut w)?;
+
+        Ok(())
+    }
+}
+
+impl Encode for BitVec {
+    fn encode(&self, mut w: impl Write) -> Result<()> {
+        let mut longs: Vec<i64> = vec![0; (self.len() as f64 / 64.0).ceil() as usize];
+
+        for (i, b) in self.iter().enumerate() {
+            longs[i / 64] |= i64::from(b) << (63 - (i % 64))
+        }
+
+        VarInt(longs.len() as i32).encode(&mut w)?;
+        
+        for long in longs {
+            long.encode(&mut w)?;
+        }
 
         Ok(())
     }

@@ -58,9 +58,21 @@ impl Encode for u8 {
     }
 }
 
+impl Encode for i16 {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        Ok(w.write_i16::<BigEndian>(*self)?)
+    }
+}
+
 impl Encode for i32 {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         Ok(w.write_i32::<BigEndian>(*self)?)
+    }
+}
+
+impl<'a> Decode<'a> for i64 {
+    fn decode(r: &mut &'a [u8]) -> Result<Self> {
+        Ok(r.read_i64::<BigEndian>()?)
     }
 }
 

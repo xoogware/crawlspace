@@ -17,7 +17,6 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-
 use color_eyre::eyre::Result;
 use player::SharedPlayer;
 use tokio::net::TcpListener;

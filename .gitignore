@@ -1,3 +1,5 @@
 /target
 # nix build result
 result
+log
+tmp/

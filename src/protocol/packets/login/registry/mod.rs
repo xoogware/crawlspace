@@ -53,6 +53,12 @@ pub struct Registry<T: RegistryItem> {
     entries: Vec<RegistryEntry<T>>,
 }
 
+impl<T: RegistryItem> Registry<T> {
+    pub fn index_of(&self, id: &str) -> i32 {
+        self.entries.iter().position(|e| e.id == id).unwrap_or_else(|| panic!("Element {id} should be in registry {}!", self.registry_id)).try_into().unwrap()
+    }
+}
+
 impl<T> Packet for Registry<T>
 where
     T: RegistryItem,

@@ -17,9 +17,13 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use std::sync::LazyLock;
+
 use serde::{Deserialize, Serialize};
 
-use super::RegistryItem;
+use crate::protocol::datatypes::VarInt;
+
+use super::{RegistryItem, ALL_REGISTRIES};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DimensionType {

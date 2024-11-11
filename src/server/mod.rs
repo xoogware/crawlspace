@@ -19,13 +19,15 @@
 
 pub mod ticker;
 
-mod world;
+use std::{sync::Arc, time::Duration};
 
-use std::sync::Arc;
+use color_eyre::eyre::Result;
+use tokio::time;
 
-use world::World;
-
-use crate::{net::player::SharedPlayer, CrawlState};
+use crate::{
+    net::player::SharedPlayer, protocol::packets::play::ChunkDataUpdateLightC, world::World,
+    CrawlState,
+};
 
 use self::ticker::Ticker;
 
@@ -33,7 +35,7 @@ use self::ticker::Ticker;
 pub struct Server {
     pub ticker: Ticker,
 
-    world: Option<Arc<World>>,
+    world: Arc<World>,
     players: Vec<SharedPlayer>,
 
     crawlstate: CrawlState,
@@ -41,22 +43,37 @@ pub struct Server {
 
 impl Server {
     #[must_use]
-    pub fn new(state: CrawlState, tick_rate: u8) -> Self {
+    pub fn new(state: CrawlState, world: World, tick_rate: u8) -> Self {
         Server {
             ticker: Ticker::new(tick_rate),
-            world: None,
+            world: Arc::new(world),
             players: Vec::new(),
             crawlstate: state,
         }
     }
 
-    #[tracing::instrument]
     async fn tick(&mut self) {
         let state = self.crawlstate.clone();
         let mut player_recv = state.player_recv.lock().await;
 
         while let Ok(p) = player_recv.try_recv() {
-            self.players.push(p);
+            self.players.push(p.clone());
+            tokio::spawn(Self::send_world_to(p.clone(), self.world.clone()));
         }
+    }
+
+    async fn send_world_to(player: SharedPlayer, world: Arc<World>) -> Result<()> {
+        let mut io = player.0.io.lock().await;
+
+        for (_, chunk) in world.0.iter() {
+            let chunk_update = ChunkDataUpdateLightC::from(chunk);
+            io.tx(&chunk_update).await?;
+        }
+
+        drop(io);
+
+        player.teleport_awaiting(0.0, 100.0, 0.0, 0.0, 0.0).await?;
+
+        Ok(())
     }
 }
