@@ -192,10 +192,7 @@ impl Encode for ChunkDataUpdateLightC<'_> {
 impl ChunkSection {
     fn anvil_to_sec(value: &world::Section) -> Self {
         let mut blocks: [i16; 16 * 16 * 16] = [0; 16 * 16 * 16];
-        let bit_length = (64
-            - (value.block_states.palette.len() as u64)
-                .leading_zeros())
-                .max(4);
+        let bit_length = (64 - (value.block_states.palette.len() as u64).leading_zeros()).max(4);
         let blocks_per_long = 64 / bit_length;
 
         let bit_mask = (1 << bit_length) - 1;
@@ -226,38 +223,70 @@ impl ChunkSection {
             .map(|b| palette.get(*b as usize).unwrap().0)
             .collect();
 
-        trace!("palette: {:?} (using direct)", palette);
-        trace!("blocks: {:?}", blocks);
-
         let block_count = blocks.iter().filter(|b| **b != 0).collect::<Vec<_>>().len();
 
-        let bit_length = 15;
-        let blocks_per_long = 64 / bit_length;
-        let mut data = vec![0i64; (16 * 16 * 16) / blocks_per_long as usize];
-        let mut blocks_so_far = 0;
-        let mut long_index = 0;
+        let bit_length = match palette.len() {
+            1 => 0,
+            l => (64 - l.leading_zeros()).max(4) as u8,
+        };
 
-        for block in blocks {
-            if blocks_so_far == blocks_per_long {
-                blocks_so_far = 0;
-                long_index += 1;
+        let palette = {
+            if bit_length == 15 {
+                Palette::Direct
+            } else if bit_length >= 4 {
+                Palette::Indirect(VarInt(palette.len() as i32), palette)
+            } else {
+                Palette::SingleValued(*palette.first().unwrap())
             }
+        };
 
-            let block = block as i64;
+        let blocks = match palette {
+            Palette::Indirect(_, ref p) => blocks
+                .iter()
+                .map(|requested| p.iter().position(|pb| pb.0 == *requested).unwrap() as u16)
+                .collect::<Vec<_>>(),
+            _ => blocks,
+        };
 
-            data[long_index] |= block << (blocks_so_far * bit_length);
-            blocks_so_far += 1;
-        }
+        trace!("palette: {:?}", palette);
+        trace!("blocks: {:?}", blocks);
 
-        trace!("data: {:?}", data);
-        let data = fastnbt::LongArray::new(data.to_vec());
-        trace!("data: {:?}", data);
+        let data = {
+            let data = match palette {
+                Palette::Direct | Palette::Indirect(..) => {
+                    let blocks_per_long = 64 / bit_length;
+                    let mut data = vec![0i64; (16 * 16 * 16) / blocks_per_long as usize];
+                    let mut blocks_so_far = 0;
+                    let mut long_index = 0;
+
+                    for block in blocks {
+                        if blocks_so_far == blocks_per_long {
+                            blocks_so_far = 0;
+                            long_index += 1;
+                        }
+
+                        let block = block as i64;
+
+                        data[long_index] |= block << (blocks_so_far * bit_length);
+                        blocks_so_far += 1;
+                        trace!("block: {} ({:b}), long (after appending): {:b}, blocks so far: {blocks_so_far}", block, block, data[long_index])
+                    }
+
+                    data
+                }
+                Palette::SingleValued(_) => Vec::with_capacity(0),
+            };
+
+            let data = fastnbt::LongArray::new(data.to_vec());
+            trace!("data: {:?}", data);
+            data
+        };
 
         Self {
             block_count: block_count as i16,
             block_states: PalettedContainer {
                 bits_per_entry: bit_length,
-                palette: Palette::Direct,
+                palette,
                 data_array: data,
             },
             biomes: PalettedContainer {
