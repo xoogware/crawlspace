@@ -25,7 +25,7 @@ use color_eyre::eyre::Result;
 use net::cache::WorldCache;
 use server::Server;
 use tracing_subscriber::{layer::SubscriberExt, prelude::*, EnvFilter};
-use world::{blocks::ALL_BLOCKS, read_world};
+use world::read_world;
 
 #[macro_use]
 extern crate tracing;
@@ -74,10 +74,6 @@ async fn main() -> Result<()> {
 
     info!("Loading world");
     let world = read_world(&args.map_dir)?;
-    info!("Done.");
-
-    info!("Loading blocks");
-    let _ = *ALL_BLOCKS;
     info!("Done.");
 
     info!("Generating world chunk packets");

@@ -30,7 +30,7 @@ bytes = "1.8.0"
 cfb8 = { version = "0.8.1", optional = true }
 clap = { version = "4.5.20", features = ["derive"] }
 color-eyre = "0.6.3"
-fastanvil = "0.31.0"
+fastanvil = { git = "https://github.com/owengage/fastnbt.git" }
 fastnbt = { git = "https://github.com/owengage/fastnbt.git" }
 rand = "0.8.5"
 rayon = "1.10.0"

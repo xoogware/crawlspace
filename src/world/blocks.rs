@@ -17,20 +17,21 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::HashMap, sync::LazyLock};
+use std::collections::HashMap;
 
-use color_eyre::eyre::Result;
 use serde::Deserialize;
 
 use super::Block;
 
-pub static ALL_BLOCKS: LazyLock<Blocks> = LazyLock::new(|| {
-    serde_json::from_str(include_str!("../../assets/blocks.json"))
-        .expect("blocks.json should be parseable")
-});
-
 #[derive(Debug, Deserialize)]
 pub struct Blocks(HashMap<String, PossibleBlock>);
+
+impl Blocks {
+    pub fn new() -> Self {
+        serde_json::from_str(include_str!("../../assets/blocks.json"))
+            .expect("blocks.json should be parseable")
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct BlockState(pub u16);
@@ -39,36 +40,24 @@ impl BlockState {
     pub const AIR: Self = Self(0);
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum BlockStateError {
-    #[error("Block not found")]
-    NotFound,
-}
-
-impl TryFrom<&Block> for BlockState {
-    type Error = BlockStateError;
-
-    fn try_from(value: &Block) -> Result<Self, Self::Error> {
+impl BlockState {
+    pub fn parse_state(value: &Block, block_states: &Blocks) -> Option<Self> {
         // TODO: build map lazily to speed up load time?
-        ALL_BLOCKS
-            .0
-            .get(&value.name)
-            .and_then(|b| {
-                b.states
-                    .iter()
-                    .find(|s| s.properties == value.properties)
-                    .map(|b| Self(b.id))
-            })
-            .ok_or(BlockStateError::NotFound)
+        block_states.0.get(&value.name).and_then(|b| {
+            b.states
+                .iter()
+                .find(|s| s.properties == value.properties)
+                .map(|b| Self(b.id))
+        })
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct PossibleBlock {
     states: Vec<PossibleBlockState>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct PossibleBlockState {
     id: u16,
     #[serde(default)]

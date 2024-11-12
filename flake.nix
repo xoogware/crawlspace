@@ -62,6 +62,7 @@
 
           packages = with pkgs; [
             rust-analyzer
+            valgrind
           ];
         };
 
@@ -72,6 +73,7 @@
               inherit version;
               src = ./.;
               cargoLock.lockFile = ./Cargo.lock;
+              cargoLock.outputHashes."fastanvil-0.31.0" = "E4WI6SZgkjqUOtbfXfKGfpFH7btEh5V0KpMXSIsuh08=";
               cargoLock.outputHashes."fastnbt-2.5.0" = "E4WI6SZgkjqUOtbfXfKGfpFH7btEh5V0KpMXSIsuh08=";
               inherit buildType;
               dontStrip = buildType == "debug";

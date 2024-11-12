@@ -27,7 +27,7 @@ use crate::{
     protocol::{datatypes::VarInt, Encode, Packet},
     world::{
         self,
-        blocks::BlockState,
+        blocks::{BlockState, Blocks},
     },
 };
 
@@ -189,7 +189,7 @@ impl Encode for ChunkDataUpdateLightC<'_> {
 }
 
 impl ChunkSection {
-    pub fn anvil_to_sec(value: &world::Section) -> Self {
+    pub fn anvil_to_sec(value: &world::Section, block_states: &Blocks) -> Self {
         let mut blocks: [i16; 16 * 16 * 16] = [0; 16 * 16 * 16];
         let bit_length = (64 - (value.block_states.palette.len() as u64).leading_zeros()).max(4);
         let blocks_per_long = 64 / bit_length;
@@ -214,7 +214,7 @@ impl ChunkSection {
             .block_states
             .palette
             .iter()
-            .map(|b| BlockState::try_from(b).unwrap_or(BlockState::AIR))
+            .map(|b| BlockState::parse_state(b, block_states).unwrap_or(BlockState::AIR))
             .collect::<Vec<_>>();
 
         let blocks: Vec<u16> = blocks
@@ -297,12 +297,12 @@ impl ChunkSection {
     }
 }
 
-impl From<&world::Chunk> for ChunkDataUpdateLightC<'_> {
-    fn from(value: &world::Chunk) -> Self {
+impl ChunkDataUpdateLightC<'_> {
+    pub fn new(value: &world::Chunk, block_states: &Blocks) -> Self {
         let data = value
             .sections
             .iter()
-            .map(ChunkSection::anvil_to_sec)
+            .map(|sec| ChunkSection::anvil_to_sec(sec, block_states))
             .collect::<Vec<_>>();
 
         Self {

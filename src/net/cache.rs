@@ -30,7 +30,7 @@ use crate::{
         },
         Encoder,
     },
-    world::World,
+    world::{blocks::Blocks, World},
 };
 
 #[derive(Debug)]
@@ -50,9 +50,11 @@ impl From<World> for WorldCache {
             }
         });
 
+        let block_states = Blocks::new();
+
         let chunks = chunks
             .par_iter()
-            .map(|(_, c)| ChunkDataUpdateLightC::from(*c))
+            .map(|(_, c)| ChunkDataUpdateLightC::new(c, &block_states))
             .collect::<Vec<ChunkDataUpdateLightC<'_>>>();
 
         let encoded = chunks
