@@ -21,8 +21,6 @@ use std::{sync::Arc, time::Duration};
 
 use color_eyre::eyre::Result;
 use rand::Rng;
-use registry::Registry;
-// use registry::Registry;
 use serde_json::json;
 use thiserror::Error;
 use tokio::{

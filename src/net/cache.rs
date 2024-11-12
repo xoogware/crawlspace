@@ -19,11 +19,13 @@
 
 use std::cmp::Ordering;
 
+use rayon::prelude::*;
+
 use crate::{
     protocol::{
         datatypes::VarInt,
         packets::{
-            login::registry::{AllRegistries, DimensionType, Registry},
+            login::registry::{AllRegistries, Registry},
             play::ChunkDataUpdateLightC,
         },
         Encoder,
@@ -49,19 +51,20 @@ impl From<World> for WorldCache {
         });
 
         let chunks = chunks
-            .iter()
+            .par_iter()
             .map(|(_, c)| ChunkDataUpdateLightC::from(*c))
             .collect::<Vec<ChunkDataUpdateLightC<'_>>>();
 
-        let mut encoder = Encoder::new();
-        let mut encoded = Vec::with_capacity(chunks.len());
-
-        chunks.iter().for_each(|chunk| {
-            encoder
-                .append_packet(chunk)
-                .expect("Failed to append packet to encoder");
-            encoded.push(encoder.take().to_vec());
-        });
+        let encoded = chunks
+            .par_iter()
+            .map(|chunk| {
+                let mut encoder = Encoder::new();
+                encoder
+                    .append_packet(chunk)
+                    .expect("Failed to append packet to encoder");
+                encoder.take().to_vec()
+            })
+            .collect();
 
         Self { encoded }
     }

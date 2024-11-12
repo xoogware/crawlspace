@@ -21,6 +21,7 @@ use std::{collections::HashMap, fs::File};
 
 use color_eyre::eyre::Result;
 use fastanvil::Region;
+use rayon::prelude::*;
 use serde::Deserialize;
 
 pub mod blocks;
@@ -110,13 +111,13 @@ pub struct Biomes {
 
 pub fn read_world(path: &str) -> Result<World> {
     let folder = std::fs::read_dir(path).unwrap();
-    let mut chunks = World(HashMap::new());
+    let chunks = std::sync::Mutex::new(HashMap::new());
 
-    for path in folder {
-        let file = File::open(path.unwrap().path())?;
-        let mut region = Region::from_stream(file)?;
+    folder.into_iter().par_bridge().for_each(|path| {
+        let file = File::open(path.unwrap().path()).expect("Failed to open file");
+        let mut region = Region::from_stream(file).expect("Failed to create region from stream");
 
-        for chunk in region.iter() {
+        region.iter().par_bridge().for_each(|chunk| {
             let chunk = chunk.unwrap();
             let mut parsed: Chunk = fastnbt::from_bytes(&chunk.data).unwrap_or_else(|e| {
                 panic!(
@@ -139,10 +140,12 @@ pub fn read_world(path: &str) -> Result<World> {
                 );
                 trace!("{:?}", parsed);
 
-                chunks.0.insert((parsed.x_pos, parsed.z_pos), parsed);
+                let mut chunks = chunks.lock().expect("Failed to lock chunk mutex");
+                chunks.insert((parsed.x_pos, parsed.z_pos), parsed);
             }
-        }
-    }
+        });
+    });
 
-    Ok(chunks)
+    let chunks = chunks.lock().expect("Failed to lock chunk mutex");
+    Ok(World(chunks.clone()))
 }

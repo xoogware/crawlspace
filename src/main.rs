@@ -46,7 +46,6 @@ type CrawlState = Arc<state::State>;
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    // RUST_LOG=crawlspace=trace
     match cfg!(debug_assertions) {
         true => {
             let filter = EnvFilter::from_default_env();
@@ -63,7 +62,9 @@ async fn main() -> Result<()> {
                 .with(tracing_subscriber::fmt::layer().with_writer(file))
                 .init();
         }
-        false => tracing_subscriber::fmt::init(),
+        false => tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer())
+            .init(),
     }
 
     info!("Loading world");
