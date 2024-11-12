@@ -24,6 +24,7 @@ use fastanvil::Region;
 use serde::Deserialize;
 
 pub mod blocks;
+pub mod cache;
 
 #[derive(Clone, Debug)]
 pub struct World(pub HashMap<(i32, i32), Chunk>);

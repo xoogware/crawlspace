@@ -26,7 +26,7 @@ use std::{
 use color_eyre::eyre::Result;
 use server::Server;
 use tracing_subscriber::{layer::SubscriberExt, prelude::*, EnvFilter};
-use world::{blocks::ALL_BLOCKS, read_world};
+use world::{blocks::ALL_BLOCKS, cache::WorldCache, read_world};
 
 #[macro_use]
 extern crate tracing;
@@ -77,6 +77,10 @@ async fn main() -> Result<()> {
     let _ = *ALL_BLOCKS;
     info!("Done.");
 
+    info!("Generating world chunk packets");
+    let world_cache = WorldCache::from(world);
+    info!("Done.");
+
     let port = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse::<u16>().ok())
@@ -95,7 +99,7 @@ async fn main() -> Result<()> {
 
     net::spawn_net_handler(state.clone()).await?;
 
-    let server = Server::new(state.clone(), world, TICK_RATE);
+    let server = Server::new(state.clone(), world_cache, TICK_RATE);
 
     {
         let mut ticker = server.ticker;

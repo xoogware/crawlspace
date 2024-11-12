@@ -190,7 +190,7 @@ impl Encode for ChunkDataUpdateLightC<'_> {
 }
 
 impl ChunkSection {
-    fn anvil_to_sec(value: &world::Section) -> Self {
+    pub fn anvil_to_sec(value: &world::Section) -> Self {
         let mut blocks: [i16; 16 * 16 * 16] = [0; 16 * 16 * 16];
         let bit_length = (64 - (value.block_states.palette.len() as u64).leading_zeros()).max(4);
         let blocks_per_long = 64 / bit_length;

@@ -123,6 +123,11 @@ impl NetIo {
         Ok(self.stream.write_all(&bytes).await?)
     }
 
+    pub async fn tx_raw(&mut self, packet: &[u8]) -> Result<()> {
+        trace!("Sending packet {:?}", packet);
+        Ok(self.stream.write_all(packet).await?)
+    }
+
     pub async fn flush(&mut self) -> Result<()> {
         self.stream.flush().await?;
         Ok(())
