@@ -19,15 +19,12 @@
 
 pub mod ticker;
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use color_eyre::eyre::Result;
-use tokio::time;
 
 use crate::{
-    net::player::SharedPlayer,
-    protocol::packets::play::ChunkDataUpdateLightC,
-    world::{cache::WorldCache, World},
+    net::{cache::WorldCache, player::SharedPlayer},
     CrawlState,
 };
 
@@ -68,7 +65,7 @@ impl Server {
         let mut io = player.0.io.lock().await;
 
         for packet in world_cache.encoded.iter() {
-            io.tx_raw(packet.as_slice()).await?;
+            io.tx_raw(packet).await?;
         }
 
         Ok(())

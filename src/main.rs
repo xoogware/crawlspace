@@ -17,16 +17,13 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    fs::OpenOptions,
-    sync::{Arc, LazyLock},
-    time::Duration,
-};
+use std::{fs::OpenOptions, sync::Arc};
 
 use color_eyre::eyre::Result;
+use net::cache::WorldCache;
 use server::Server;
 use tracing_subscriber::{layer::SubscriberExt, prelude::*, EnvFilter};
-use world::{blocks::ALL_BLOCKS, cache::WorldCache, read_world};
+use world::{blocks::ALL_BLOCKS, read_world};
 
 #[macro_use]
 extern crate tracing;

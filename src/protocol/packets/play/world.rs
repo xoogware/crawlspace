@@ -20,15 +20,14 @@
 use std::collections::HashMap;
 
 use bit_vec::BitVec;
-use bytes::{BufMut, BytesMut};
+use bytes::BufMut;
 use fastnbt::SerOpts;
-use serde::Serialize;
 
 use crate::{
-    protocol::{datatypes::VarInt, packets::login::registry::Registry, Encode, Packet},
+    protocol::{datatypes::VarInt, Encode, Packet},
     world::{
         self,
-        blocks::{BlockState, Blocks, ALL_BLOCKS},
+        blocks::BlockState,
     },
 };
 

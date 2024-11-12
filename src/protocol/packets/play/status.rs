@@ -109,6 +109,7 @@ impl PlayerAction<'_> {
     }
 }
 
+#[allow(unused)]
 impl<'a> PlayerStatus<'a> {
     pub fn for_player(player: Uuid) -> Self {
         Self {

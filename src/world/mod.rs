@@ -24,7 +24,6 @@ use fastanvil::Region;
 use serde::Deserialize;
 
 pub mod blocks;
-pub mod cache;
 
 #[derive(Clone, Debug)]
 pub struct World(pub HashMap<(i32, i32), Chunk>);
@@ -32,17 +31,17 @@ pub struct World(pub HashMap<(i32, i32), Chunk>);
 #[derive(Clone, Debug, Deserialize)]
 pub struct Chunk {
     #[serde(rename = "DataVersion")]
-    pub data_version: i32,
+    pub _data_version: i32,
     #[serde(rename = "xPos")]
     pub x_pos: i32,
     #[serde(rename = "zPos")]
     pub z_pos: i32,
     #[serde(rename = "yPos")]
-    pub y_pos: i32,
+    pub _y_pos: i32,
     #[serde(rename = "Status")]
-    pub status: ChunkStatus,
+    pub _status: ChunkStatus,
     #[serde(rename = "LastUpdate")]
-    pub last_update: f64,
+    pub _last_update: f64,
     pub sections: Vec<Section>,
 }
 
@@ -79,11 +78,12 @@ pub struct Section {
     #[serde(rename = "Y")]
     pub y: i32,
     pub block_states: BlockStates,
-    pub biomes: Biomes,
+    #[serde(rename = "biomes")]
+    pub _biomes: Biomes,
     #[serde(rename = "BlockLight")]
-    pub block_light: Option<fastnbt::ByteArray>,
+    pub _block_light: Option<fastnbt::ByteArray>,
     #[serde(rename = "SkyLight")]
-    pub sky_light: Option<fastnbt::ByteArray>,
+    pub _sky_light: Option<fastnbt::ByteArray>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -102,8 +102,10 @@ pub struct Block {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Biomes {
-    pub palette: Vec<String>,
-    pub data: Option<fastnbt::LongArray>,
+    #[serde(rename = "palette")]
+    pub _palette: Vec<String>,
+    #[serde(rename = "data")]
+    pub _data: Option<fastnbt::LongArray>,
 }
 
 pub fn read_world(path: &str) -> Result<World> {

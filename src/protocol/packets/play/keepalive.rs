@@ -33,6 +33,7 @@ impl Encode for KeepAliveC {
 }
 
 #[derive(Debug)]
+#[expect(unused)]
 pub struct KeepAliveS(i64);
 
 impl Packet for KeepAliveS {

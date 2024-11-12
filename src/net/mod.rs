@@ -21,8 +21,10 @@ use color_eyre::eyre::Result;
 use player::SharedPlayer;
 use tokio::net::TcpListener;
 
-mod io;
+pub mod cache;
 pub mod player;
+
+mod io;
 
 use crate::CrawlState;
 

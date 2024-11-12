@@ -22,7 +22,10 @@ use std::sync::{atomic::AtomicUsize, Arc};
 use tokio::sync::{mpsc, Mutex, Semaphore};
 use tokio_util::sync::CancellationToken;
 
-use crate::net::player::SharedPlayer;
+use crate::{
+    net::{cache::RegistryCache, player::SharedPlayer},
+    protocol::packets::login::registry::ALL_REGISTRIES,
+};
 
 #[derive(Debug)]
 pub struct State {
@@ -32,6 +35,8 @@ pub struct State {
     pub version_name: String,
     pub version_number: i32,
     pub port: u16,
+
+    pub registry_cache: RegistryCache,
 
     pub player_send: mpsc::Sender<SharedPlayer>,
     pub player_recv: Mutex<mpsc::Receiver<SharedPlayer>>,
@@ -66,6 +71,8 @@ impl State {
             version_name: version_name.to_owned(),
             version_number: version_number.to_owned(),
             port,
+
+            registry_cache: RegistryCache::from(&*ALL_REGISTRIES),
 
             player_send,
             player_recv: Mutex::new(player_recv),

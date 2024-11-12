@@ -38,12 +38,11 @@ use crate::{
         packets::{
             login::*,
             play::{
-                ChunkDataUpdateLightC, ConfirmTeleportS, GameEvent, GameEventC, Gamemode,
-                KeepAliveC, LoginPlayC, PlayerInfoUpdateC, PlayerStatus, SetCenterChunkC,
-                SynchronisePositionC,
+                ConfirmTeleportS, GameEvent, GameEventC, Gamemode, KeepAliveC, LoginPlayC,
+                PlayerInfoUpdateC, PlayerStatus, SetCenterChunkC, SynchronisePositionC,
             },
         },
-        PacketState, Property,
+        PacketState,
     },
     CrawlState,
 };
@@ -64,14 +63,11 @@ pub struct Player {
 
     uuid: RwLock<Option<Uuid>>,
     tp_state: Mutex<TeleportState>,
-
-    // FIXME: uh
-    the_end_id: Mutex<i32>,
 }
 
 #[derive(Debug)]
 enum TeleportState {
-    Pending(i32, time::Instant),
+    Pending(i32),
     Clear,
 }
 
@@ -96,8 +92,6 @@ impl SharedPlayer {
             packet_state: RwLock::new(PacketState::Handshaking),
 
             tp_state: Mutex::new(TeleportState::Clear),
-
-            the_end_id: Mutex::new(0),
         }))
     }
 
@@ -240,28 +234,7 @@ impl SharedPlayer {
         // TODO: maybe(?) actually handle this
         io.rx::<KnownPacksS>().await?;
 
-        let registry = &*registry::ALL_REGISTRIES;
-        let dimensions = Registry::from(registry.dimension_type.clone());
-        io.tx(&Registry::from(registry.trim_material.clone()))
-            .await?;
-        io.tx(&Registry::from(registry.trim_pattern.clone()))
-            .await?;
-        io.tx(&Registry::from(registry.banner_pattern.clone()))
-            .await?;
-        io.tx(&Registry::from(registry.biome.clone())).await?;
-        io.tx(&Registry::from(registry.chat_type.clone())).await?;
-        io.tx(&Registry::from(registry.damage_type.clone())).await?;
-        io.tx(&dimensions)
-            .await?;
-        io.tx(&Registry::from(registry.wolf_variant.clone()))
-            .await?;
-        io.tx(&Registry::from(registry.painting_variant.clone()))
-            .await?;
-
-        {
-            let mut the_end_id = self.0.the_end_id.lock().await;
-            *the_end_id = dimensions.index_of("minecraft:the_end");
-        }
+        io.tx_raw(&state.registry_cache.encoded).await?;
 
         io.tx(&FinishConfigurationC).await?;
         io.rx::<FinishConfigurationAckS>().await?;
@@ -291,11 +264,6 @@ impl SharedPlayer {
 
         let max_players: i32 = state.max_players.try_into().unwrap_or(50);
 
-        let the_end_id = {
-            let the_end_id = self.0.the_end_id.lock().await;
-            *the_end_id
-        };
-
         let login = LoginPlayC {
             entity_id: self.0.id as i32,
             is_hardcore: false,
@@ -306,7 +274,7 @@ impl SharedPlayer {
             reduced_debug_info: !cfg!(debug_assertions),
             enable_respawn_screen: false,
             do_limited_crafting: false,
-            dimension_type: VarInt(the_end_id),
+            dimension_type: state.registry_cache.the_end_id,
             dimension_name: Bounded::<&'static str>("minecraft:the_end"),
             hashed_seed: 0,
             gamemode: Gamemode::Creative,
@@ -384,7 +352,7 @@ impl SharedPlayer {
         let tp_state = self.0.tp_state.lock().await;
         match *tp_state {
             TeleportState::Clear => Err(TeleportError::Unexpected),
-            TeleportState::Pending(expected, _) => match id == expected {
+            TeleportState::Pending(expected) => match id == expected {
                 true => Ok(()),
                 false => Err(TeleportError::WrongId(expected, id)),
             },
@@ -410,7 +378,7 @@ impl SharedPlayer {
         {
             let mut tp_state = self.0.tp_state.lock().await;
             // player will be given 5 (FIVE) SECONDS TO ACK!!!!!
-            *tp_state = TeleportState::Pending(tp.id, time::Instant::now());
+            *tp_state = TeleportState::Pending(tp.id);
         }
         io.tx(&tp).await?;
 

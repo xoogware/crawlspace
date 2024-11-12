@@ -34,6 +34,7 @@ pub struct SynchronisePositionC {
     pub id: i32,
 }
 
+#[allow(unused)]
 mod flags {
     pub const X: i8 = 0x01;
     pub const Y: i8 = 0x02;
@@ -42,6 +43,7 @@ mod flags {
     pub const X_ROT: i8 = 0x10;
 }
 
+#[allow(unused)]
 impl SynchronisePositionC {
     pub fn new(x: f64, y: f64, z: f64, yaw: f32, pitch: f32) -> Self {
         Self {
