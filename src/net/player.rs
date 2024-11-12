@@ -46,7 +46,7 @@ use crate::{
 };
 
 #[cfg(feature = "encryption")]
-use crate::protocol::{datatypes::Bytes, packets::PluginRequestC};
+use crate::protocol::{datatypes::Bytes, packets::login::PluginRequestC};
 
 use super::io::NetIo;
 
@@ -241,14 +241,15 @@ impl SharedPlayer {
     }
 
     #[cfg(feature = "encryption")]
-    async fn login_velocity(&mut self, _username: &str) -> Result<()> {
+    async fn login_velocity(&self, _username: &str) -> Result<()> {
         let req = PluginRequestC {
             message_id: VarInt(0),
             channel: Bounded("velocity:player_info"),
             data: Bounded(Bytes(&[3])),
         };
 
-        self.io.tx(&req).await?;
+        let mut io = self.0.io.lock().await;
+        io.tx(&req).await?;
 
         Ok(())
     }
