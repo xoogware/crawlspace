@@ -51,8 +51,9 @@ pub async fn spawn_lan_broadcast(state: CrawlState) -> Result<()> {
 }
 
 pub async fn spawn_net_handler(state: CrawlState) -> Result<()> {
+    let addr = state.addr.clone();
     let port = state.port;
-    let listener = TcpListener::bind(format!("[::]:{port}")).await?;
+    let listener = TcpListener::bind(format!("{addr}:{port}")).await?;
     warn!("Listening on port {port}.");
     tokio::spawn(net_handler(state, listener));
     Ok(())

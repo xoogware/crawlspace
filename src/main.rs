@@ -19,6 +19,8 @@
 
 use std::{fs::OpenOptions, sync::Arc};
 
+use args::Args;
+use clap::Parser;
 use color_eyre::eyre::Result;
 use net::cache::WorldCache;
 use server::Server;
@@ -28,6 +30,7 @@ use world::{blocks::ALL_BLOCKS, read_world};
 #[macro_use]
 extern crate tracing;
 
+mod args;
 mod net;
 mod protocol;
 mod server;
@@ -67,8 +70,10 @@ async fn main() -> Result<()> {
             .init(),
     }
 
+    let args = Args::parse();
+
     info!("Loading world");
-    let world = read_world("./tmp/DIM1/region")?;
+    let world = read_world(&args.map_dir)?;
     info!("Done.");
 
     info!("Loading blocks");
@@ -79,17 +84,13 @@ async fn main() -> Result<()> {
     let world_cache = WorldCache::from(world);
     info!("Done.");
 
-    let port = std::env::var("PORT")
-        .ok()
-        .and_then(|p| p.parse::<u16>().ok())
-        .unwrap_or(25565);
-
     let state = Arc::new(state::State::new(
         VERSION,
         VERSION_NUM,
         DESCRIPTION,
         MAX_PLAYERS,
-        port,
+        args.addr(),
+        args.port(),
     ));
 
     #[cfg(feature = "lan")]

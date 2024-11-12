@@ -34,6 +34,7 @@ pub struct State {
     pub description: String,
     pub version_name: String,
     pub version_number: i32,
+    pub addr: String,
     pub port: u16,
 
     pub registry_cache: RegistryCache,
@@ -53,6 +54,7 @@ impl State {
         version_number: i32,
         description: &str,
         max_players: usize,
+        addr: String,
         port: u16,
     ) -> Self {
         let max = max_players.min(Semaphore::MAX_PERMITS);
@@ -70,6 +72,7 @@ impl State {
             description: description.to_owned(),
             version_name: version_name.to_owned(),
             version_number: version_number.to_owned(),
+            addr,
             port,
 
             registry_cache: RegistryCache::from(&*ALL_REGISTRIES),

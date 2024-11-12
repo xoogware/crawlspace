@@ -17,7 +17,11 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::HashMap, fs::File};
+use std::{
+    collections::HashMap,
+    fs::File,
+    path::Path,
+};
 
 use color_eyre::eyre::Result;
 use fastanvil::Region;
@@ -110,7 +114,8 @@ pub struct Biomes {
 }
 
 pub fn read_world(path: &str) -> Result<World> {
-    let folder = std::fs::read_dir(path).unwrap();
+    let folder = Path::new(path).join("region");
+    let folder = std::fs::read_dir(folder).unwrap();
     let chunks = std::sync::Mutex::new(HashMap::new());
 
     folder.into_iter().par_bridge().for_each(|path| {
