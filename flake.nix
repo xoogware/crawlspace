@@ -60,10 +60,13 @@
             self'.packages.default
           ];
 
-          packages = with pkgs; [
-            rust-analyzer
-            valgrind
-          ];
+          packages = with pkgs;
+            [
+              rust-analyzer
+            ]
+            ++ lib.optionals (system == "x86_64-linux" || system == "aarch64-linux") [
+              valgrind
+            ];
         };
 
         packages = let
