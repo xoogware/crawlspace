@@ -23,22 +23,27 @@ use clap::Parser;
 pub struct Args {
     /// The directory to load the map from. Should be DIM1, or the equivalent renamed folder.
     pub map_dir: String,
-    /// The address to serve crawlspace on. Defaults to [::] (all interfaces) if not set.
-    #[arg(short, long)]
-    addr: Option<String>,
+    /// The address to serve crawlspace on.
+    #[arg(short, long, default_value = "[::]")]
+    pub addr: String,
     /// The port to serve crawlspace on. Defaults to 25565 if not set.
-    #[arg(short, long)]
-    port: Option<u16>,
-}
-
-impl Args {
-    #[inline(always)]
-    pub fn addr(&self) -> String {
-        self.addr.clone().unwrap_or("[::]".into())
-    }
-
-    #[inline(always)]
-    pub fn port(&self) -> u16 {
-        self.port.unwrap_or(25565)
-    }
+    #[arg(short, long, default_value = "25565")]
+    pub port: u16,
+    /// The x coordinate of the spawnpoint.
+    #[arg(short = 'x', long, default_value = "0")]
+    pub spawn_x: f64,
+    /// The y coordinate of the spawnpoint.
+    #[arg(short = 'y', long, default_value = "100")]
+    pub spawn_y: f64,
+    /// The z coordinate of the spawnpoint.
+    #[arg(short = 'z', long, default_value = "0")]
+    pub spawn_z: f64,
+    /// The border radius, centered around the spawnpoint. Defaults to 10 chunks. One
+    /// chunk past the border will be loaded.
+    #[arg(short = 'b', long, default_value = "160")]
+    pub border_radius: i32,
+    #[arg(short, long, default_value = "Limbo")]
+    pub motd: String,
+    #[arg(long, default_value = "500")]
+    pub max_players: usize,
 }

@@ -39,8 +39,6 @@ mod world;
 
 const VERSION: &str = "1.21.1";
 const VERSION_NUM: i32 = 767;
-const DESCRIPTION: &str = "sheldon cooper residence";
-const MAX_PLAYERS: usize = 906;
 const TICK_RATE: u8 = 20;
 
 type CrawlState = Arc<state::State>;
@@ -80,14 +78,7 @@ async fn main() -> Result<()> {
     let world_cache = WorldCache::from(world);
     info!("Done.");
 
-    let state = Arc::new(state::State::new(
-        VERSION,
-        VERSION_NUM,
-        DESCRIPTION,
-        MAX_PLAYERS,
-        args.addr(),
-        args.port(),
-    ));
+    let state = Arc::new(state::State::new(VERSION, VERSION_NUM, args));
 
     #[cfg(feature = "lan")]
     net::spawn_lan_broadcast(state.clone()).await?;

@@ -24,7 +24,10 @@ use bytes::BufMut;
 use fastnbt::SerOpts;
 
 use crate::{
-    protocol::{datatypes::VarInt, Encode, Packet},
+    protocol::{
+        datatypes::{VarInt, VarLong},
+        Encode, Packet,
+    },
     world::{
         self,
         blocks::{BlockState, Blocks},
@@ -318,5 +321,66 @@ impl ChunkDataUpdateLightC<'_> {
             sky_light_arrays: vec![],
             block_light_arrays: vec![],
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct InitializeWorldBorderC {
+    pub x: f64,
+    pub z: f64,
+    pub old_diameter: f64,
+    pub new_diameter: f64,
+    pub speed: i64,
+    pub teleport_boundary: i32,
+    pub warning_blocks: i32,
+    pub warning_time_sec: i32,
+}
+
+impl Packet for InitializeWorldBorderC {
+    const ID: i32 = 0x25;
+}
+
+impl Encode for InitializeWorldBorderC {
+    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
+        self.x.encode(&mut w)?;
+        self.z.encode(&mut w)?;
+        self.old_diameter.encode(&mut w)?;
+        self.new_diameter.encode(&mut w)?;
+        VarLong(self.speed).encode(&mut w)?;
+        VarInt(self.teleport_boundary).encode(&mut w)?;
+        VarInt(self.warning_blocks).encode(&mut w)?;
+        VarInt(self.warning_time_sec).encode(&mut w)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct SetBorderCenterC {
+    pub x: f64,
+    pub z: f64,
+}
+
+impl Packet for SetBorderCenterC {
+    const ID: i32 = 0x4D;
+}
+
+impl Encode for SetBorderCenterC {
+    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
+        self.x.encode(&mut w)?;
+        self.z.encode(&mut w)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct SetBorderSizeC(pub f64);
+
+impl Packet for SetBorderSizeC {
+    const ID: i32 = 0x4F;
+}
+
+impl Encode for SetBorderSizeC {
+    fn encode(&self, w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
+        self.0.encode(w)
     }
 }

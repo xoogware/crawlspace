@@ -37,7 +37,8 @@ use crate::{
             login::*,
             play::{
                 ConfirmTeleportS, GameEvent, GameEventC, Gamemode, KeepAliveC, LoginPlayC,
-                PlayerInfoUpdateC, PlayerStatus, SetCenterChunkC, SynchronisePositionC,
+                PlayerInfoUpdateC, PlayerStatus, SetBorderCenterC, SetBorderSizeC, SetCenterChunkC,
+                SynchronisePositionC,
             },
         },
         PacketState,
@@ -289,21 +290,33 @@ impl SharedPlayer {
 
         drop(io);
 
-        self.teleport_awaiting(0.0, 100.0, 0.0, 0.0, 0.0).await?;
+        let spawnpoint = state.spawnpoint;
+        self.teleport_awaiting(spawnpoint.0, spawnpoint.1, spawnpoint.2, 0.0, 0.0)
+            .await?;
+
+        let mut io = self.0.io.lock().await;
+
+        io.tx(&SetBorderCenterC {
+            x: spawnpoint.0,
+            z: spawnpoint.2,
+        })
+        .await?;
+
+        io.tx(&SetBorderSizeC(state.border_radius as f64 * 2.0))
+            .await?;
 
         let player_add = PlayerInfoUpdateC {
             players: &[PlayerStatus::for_player(self.uuid().await).add_player("AFK", &[])],
         };
 
-        let mut io = self.0.io.lock().await;
         io.tx(&player_add).await?;
 
         let await_chunks = GameEventC::from(GameEvent::StartWaitingForLevelChunks);
         io.tx(&await_chunks).await?;
 
         let set_center = SetCenterChunkC {
-            x: VarInt(0),
-            y: VarInt(0),
+            x: VarInt(spawnpoint.0.floor() as i32 / 16),
+            y: VarInt(spawnpoint.2.floor() as i32 / 16),
         };
         io.tx(&set_center).await?;
         drop(io);

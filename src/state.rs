@@ -23,6 +23,7 @@ use tokio::sync::{mpsc, Mutex, Semaphore};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    args::Args,
     net::{cache::RegistryCache, player::SharedPlayer},
     protocol::packets::login::registry::ALL_REGISTRIES,
 };
@@ -45,22 +46,18 @@ pub struct State {
     pub shutdown_token: CancellationToken,
 
     pub net_sema: Arc<Semaphore>,
+
+    pub spawnpoint: (f64, f64, f64),
+    pub border_radius: i32,
 }
 
 impl State {
     #[must_use]
-    pub fn new(
-        version_name: &str,
-        version_number: i32,
-        description: &str,
-        max_players: usize,
-        addr: String,
-        port: u16,
-    ) -> Self {
-        let max = max_players.min(Semaphore::MAX_PERMITS);
+    pub fn new(version_name: &str, version_number: i32, args: Args) -> Self {
+        let max = args.max_players.min(Semaphore::MAX_PERMITS);
 
-        if max < max_players {
-            warn!("Requested max player count {max_players} is less than max semaphore permits {max} - limited to {max}.");
+        if max < args.max_players {
+            warn!("Requested max player count {} is less than max semaphore permits {max} - limited to {max}.", args.max_players);
         }
 
         let (player_send, player_recv) = mpsc::channel(16);
@@ -69,11 +66,11 @@ impl State {
         Self {
             max_players: max,
             current_players: AtomicUsize::new(0),
-            description: description.to_owned(),
+            description: args.motd,
             version_name: version_name.to_owned(),
             version_number: version_number.to_owned(),
-            addr,
-            port,
+            addr: args.addr,
+            port: args.port,
 
             registry_cache: RegistryCache::from(&*ALL_REGISTRIES),
 
@@ -83,6 +80,9 @@ impl State {
             shutdown_token,
 
             net_sema: Arc::new(Semaphore::new(max)),
+
+            spawnpoint: (args.spawn_x, args.spawn_y, args.spawn_z),
+            border_radius: args.border_radius,
         }
     }
 }
