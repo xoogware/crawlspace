@@ -48,6 +48,7 @@ uuid = "1.11.0"
 default = []
 compression = []
 encryption = ["dep:cfb8", "dep:aes"]
+modern_art = []
 lan = []
 
 full = ["compression", "encryption"]

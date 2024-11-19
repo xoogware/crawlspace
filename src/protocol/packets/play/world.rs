@@ -195,8 +195,11 @@ impl ChunkSection {
     pub fn anvil_to_sec(value: &world::Section, block_states: &Blocks) -> Self {
         let mut blocks: [i16; 16 * 16 * 16] = [0; 16 * 16 * 16];
         let bit_length = (64 - (value.block_states.palette.len() as u64).leading_zeros()).max(4);
+
+        #[cfg(not(feature = "modern_art"))]
         let blocks_per_long = 64 / bit_length;
 
+        #[cfg(not(feature = "modern_art"))]
         let bit_mask = (1 << bit_length) - 1;
 
         match value.block_states.data {
@@ -204,10 +207,23 @@ impl ChunkSection {
             Some(ref data) => {
                 let mut i = 0;
                 for long in data.iter() {
-                    let long = *long as u64;
-                    for b in 0..blocks_per_long {
-                        blocks[i] = ((long >> (bit_length * b)) & bit_mask) as i16;
-                        i += 1;
+                    #[cfg(not(feature = "modern_art"))]
+                    {
+                        let long = *long as u64;
+                        for b in 0..blocks_per_long {
+                            blocks[i] = ((long >> (bit_length * b)) & bit_mask) as i16;
+                            i += 1;
+                        }
+                    }
+
+                    #[cfg(feature = "modern_art")]
+                    {
+                        let mut long = *long as u64;
+                        while long != 0 {
+                            blocks[i] = (long & ((1 << bit_length) - 1)) as i16;
+                            long >>= bit_length;
+                            i += 1;
+                        }
                     }
                 }
             }
