@@ -80,7 +80,7 @@
               cargoLock.outputHashes."fastnbt-2.5.0" = "E4WI6SZgkjqUOtbfXfKGfpFH7btEh5V0KpMXSIsuh08=";
               inherit buildType;
               dontStrip = buildType == "debug";
-              buildInputs = with pkgs; [pkg-config openssl];
+              buildInputs = with pkgs; [pkg-config openssl cmake];
             };
         in {
           default = mkCrawlspace "debug";
