@@ -24,9 +24,10 @@ use color_eyre::eyre::{Context, Result};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    sync::RwLock,
 };
 
-use crate::protocol::{self, ClientboundPacket, Frame, ServerboundPacket};
+use crate::protocol::{self, datatypes::VarInt, ClientboundPacket, Frame, ServerboundPacket};
 
 #[derive(Debug)]
 pub struct NetIo {
@@ -34,6 +35,7 @@ pub struct NetIo {
     frame: Frame,
     decoder: protocol::Decoder,
     encoder: protocol::Encoder,
+    compression: RwLock<Option<VarInt>>,
 }
 
 const BUF_SIZE: usize = 4096;
@@ -58,6 +60,7 @@ impl NetIo {
             },
             decoder: protocol::Decoder::new(),
             encoder: protocol::Encoder::new(),
+            compression: RwLock::new(None),
         }
     }
 
