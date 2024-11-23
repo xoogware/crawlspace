@@ -193,10 +193,9 @@ impl Encode for ChunkDataUpdateLightC<'_> {
 
 impl ChunkSection {
     pub fn anvil_to_sec(value: &world::Section, block_states: &Blocks) -> Self {
-        let mut blocks: [i16; 16 * 16 * 16] = [0; 16 * 16 * 16];
+        let mut blocks = Vec::new();
         let bit_length = (64 - (value.block_states.palette.len() as u64).leading_zeros()).max(4);
 
-        #[cfg(not(feature = "modern_art"))]
         let blocks_per_long = 64 / bit_length;
 
         #[cfg(not(feature = "modern_art"))]
@@ -205,6 +204,9 @@ impl ChunkSection {
         match value.block_states.data {
             None => blocks.fill(0),
             Some(ref data) => {
+                trace!("data.len(): {}", data.len());
+                trace!("blocks_per_long: {blocks_per_long}");
+                blocks.resize(data.len() * blocks_per_long as usize, 0);
                 let mut i = 0;
                 for long in data.iter() {
                     #[cfg(not(feature = "modern_art"))]
@@ -248,6 +250,8 @@ impl ChunkSection {
             l => (64 - l.leading_zeros()).max(4) as u8,
         };
 
+        trace!("bit_length: {bit_length}");
+
         let palette = {
             if bit_length == 15 {
                 Palette::Direct
@@ -273,7 +277,7 @@ impl ChunkSection {
             let data = match palette {
                 Palette::Direct | Palette::Indirect(..) => {
                     let blocks_per_long = 64 / bit_length;
-                    let mut data = vec![0i64; (16 * 16 * 16) / blocks_per_long as usize];
+                    let mut data = vec![0i64; blocks.len() / blocks_per_long as usize];
                     let mut blocks_so_far = 0;
                     let mut long_index = 0;
 
