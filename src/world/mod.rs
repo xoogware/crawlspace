@@ -17,17 +17,15 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    collections::HashMap,
-    fs::File,
-    path::Path,
-};
+use std::{collections::HashMap, fs::File, path::Path};
 
+use block_entity::BlockEntity;
 use color_eyre::eyre::Result;
 use fastanvil::Region;
 use rayon::prelude::*;
 use serde::Deserialize;
 
+mod block_entity;
 pub mod blocks;
 
 #[derive(Clone, Debug)]
@@ -48,6 +46,7 @@ pub struct Chunk {
     #[serde(rename = "LastUpdate")]
     pub _last_update: f64,
     pub sections: Vec<Section>,
+    pub block_entities: Vec<fastnbt::Value>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -138,6 +137,10 @@ pub fn read_world(path: &str) -> Result<World> {
 
             if (-10..10).contains(&parsed.x_pos) && (-10..10).contains(&parsed.z_pos) {
                 parsed.sections.sort_by_key(|c| c.y);
+
+                parsed.block_entities.clone().into_iter().for_each(|e| {
+                    let _ = BlockEntity::try_parse(e);
+                });
 
                 debug!(
                     "Successfully parsed chunk at {}, {}",
