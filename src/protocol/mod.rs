@@ -49,6 +49,7 @@ pub mod packets {
         mod game_event;
         mod keepalive;
         mod login;
+        mod position;
         mod status;
         mod teleport;
         mod tick;
@@ -57,6 +58,7 @@ pub mod packets {
         pub use game_event::*;
         pub use keepalive::*;
         pub use login::*;
+        pub use position::*;
         pub use status::*;
         pub use teleport::*;
         pub use tick::*;

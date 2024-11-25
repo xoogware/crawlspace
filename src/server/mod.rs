@@ -59,6 +59,11 @@ impl Server {
             self.players.push(p.clone());
             tokio::spawn(Self::send_world_to(p.clone(), self.world_cache.clone()));
         }
+
+        for player in &self.players {
+            let _ = player.keepalive().await;
+            let _ = player.handle_all_packets().await;
+        }
     }
 
     async fn send_world_to(player: SharedPlayer, world_cache: Arc<WorldCache>) -> Result<()> {

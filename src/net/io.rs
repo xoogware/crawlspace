@@ -20,7 +20,7 @@
 use std::{io::ErrorKind, net::SocketAddr, time::Duration};
 
 use bytes::BytesMut;
-use color_eyre::eyre::{Context, Result};
+use color_eyre::eyre::{bail, Context, Result};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -131,5 +131,32 @@ impl NetIo {
     pub async fn flush(&mut self) -> Result<()> {
         self.stream.flush().await?;
         Ok(())
+    }
+
+    pub async fn rx_raw(&mut self) -> Result<Frame> {
+        if let Some(frame) = self
+            .decoder
+            .try_read_next()
+            .context("failed try_read_next")?
+        {
+            return Ok(frame);
+        };
+
+        self.decoder.reserve_additional(BUF_SIZE);
+        let mut buf = self.decoder.take_all();
+
+        if self
+            .stream
+            .read_buf(&mut buf)
+            .await
+            .context("failed read_buf")?
+            == 0
+        {
+            return Err(std::io::Error::from(ErrorKind::UnexpectedEof).into());
+        }
+
+        self.decoder.add_bytes(buf);
+
+        bail!("No packet available")
     }
 }

@@ -26,7 +26,7 @@ use thiserror::Error;
 use tokio::{
     net::TcpStream,
     sync::{Mutex, OwnedSemaphorePermit, RwLock},
-    time::{self, timeout},
+    time::{self, timeout, Instant},
 };
 use uuid::Uuid;
 
@@ -38,10 +38,11 @@ use crate::{
             play::{
                 ConfirmTeleportS, GameEvent, GameEventC, Gamemode, KeepAliveC, LoginPlayC,
                 PlayerInfoUpdateC, PlayerStatus, SetBorderCenterC, SetBorderSizeC, SetCenterChunkC,
-                SetTickingStateC, StepTicksC, SynchronisePositionC,
+                SetPlayerPositionAndRotationS, SetPlayerPositionS, SetTickingStateC, StepTicksC,
+                SynchronisePositionC,
             },
         },
-        PacketState,
+        Frame, Packet, PacketState,
     },
     CrawlState,
 };
@@ -62,6 +63,8 @@ pub struct Player {
 
     uuid: RwLock<Option<Uuid>>,
     tp_state: Mutex<TeleportState>,
+
+    last_keepalive: RwLock<Instant>,
 }
 
 #[derive(Debug)]
@@ -85,12 +88,14 @@ impl SharedPlayer {
             id,
             io: Mutex::new(NetIo::new(connection)),
             _permit: permit,
-            uuid: RwLock::new(None),
 
             crawlstate,
             packet_state: RwLock::new(PacketState::Handshaking),
 
             tp_state: Mutex::new(TeleportState::Clear),
+            uuid: RwLock::new(None),
+
+            last_keepalive: RwLock::new(Instant::now()),
         }))
     }
 
@@ -333,20 +338,27 @@ impl SharedPlayer {
         // thread but realistically who knows burhhhh
         state.player_send.send(self.clone()).await?;
 
-        loop {
-            tokio::select! {
-                _ = self.keepalive() => {
-                    // keepalive needs to be sent every ~15 sec after keepalive response
-                    time::sleep(Duration::from_secs(12)).await;
-                }
-                _ = state.shutdown_token.cancelled() => {
-                    return Ok(());
-                }
-            }
-        }
+        state.shutdown_token.cancelled().await;
+        Ok(())
     }
 
-    async fn keepalive(&self) -> Result<()> {
+    pub async fn handle_all_packets(&self) -> Result<()> {
+        let packets = self.rx_all().await;
+        self.handle_frames(packets).await
+    }
+
+    pub async fn keepalive(&self) -> Result<()> {
+        let last_keepalive = self.0.last_keepalive.read().await;
+        let now = Instant::now();
+
+        if now - *last_keepalive < Duration::from_secs(10) {
+            return Ok(());
+        }
+
+        drop(last_keepalive);
+        let mut last_keepalive = self.0.last_keepalive.write().await;
+        *last_keepalive = now;
+
         let id = {
             let mut rng = rand::thread_rng();
             rng.gen()
@@ -357,6 +369,17 @@ impl SharedPlayer {
             Ok(Ok(())) | Err(_) => Ok(()),
             Ok(Err(why)) => Err(why),
         }
+    }
+
+    async fn rx_all(&self) -> Vec<Frame> {
+        let mut io = self.0.io.lock().await;
+
+        let mut frames = Vec::new();
+        while let Ok(frame) = io.rx_raw().await {
+            frames.push(frame);
+        }
+
+        frames
     }
 
     async fn ping(&self, id: i64) -> Result<()> {
@@ -415,6 +438,37 @@ impl SharedPlayer {
                 Err(why)?;
             }
         }
+        Ok(())
+    }
+
+    async fn handle_frames(&self, frames: Vec<Frame>) -> Result<()> {
+        for frame in frames {
+            match frame.id {
+                SetPlayerPositionS::ID => {
+                    let packet: SetPlayerPositionS = frame.decode()?;
+                    debug!(
+                        "Player {} moved to {}, {}, {}",
+                        self.0.id, packet.x, packet.feet_y, packet.z
+                    );
+                }
+
+                SetPlayerPositionAndRotationS::ID => {
+                    let packet: SetPlayerPositionAndRotationS = frame.decode()?;
+                    debug!(
+                        "Player {} moved to {}, {}, {} rotated {} {}",
+                        self.0.id, packet.x, packet.feet_y, packet.z, packet.pitch, packet.yaw
+                    );
+                }
+
+                id => {
+                    debug!(
+                        "Got packet with id {id} from player {}, ignoring",
+                        self.0.id
+                    );
+                }
+            }
+        }
+
         Ok(())
     }
 }
