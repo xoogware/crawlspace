@@ -51,6 +51,7 @@ pub mod packets {
         mod login;
         mod status;
         mod teleport;
+        mod tick;
         mod world;
 
         pub use game_event::*;
@@ -58,6 +59,7 @@ pub mod packets {
         pub use login::*;
         pub use status::*;
         pub use teleport::*;
+        pub use tick::*;
         pub use world::*;
     }
 }
@@ -168,7 +170,7 @@ impl Encode for BitVec {
         }
 
         VarInt(longs.len() as i32).encode(&mut w)?;
-        
+
         for long in longs {
             long.encode(&mut w)?;
         }

@@ -38,7 +38,7 @@ use crate::{
             play::{
                 ConfirmTeleportS, GameEvent, GameEventC, Gamemode, KeepAliveC, LoginPlayC,
                 PlayerInfoUpdateC, PlayerStatus, SetBorderCenterC, SetBorderSizeC, SetCenterChunkC,
-                SynchronisePositionC,
+                SetTickingStateC, StepTicksC, SynchronisePositionC,
             },
         },
         PacketState,
@@ -287,6 +287,14 @@ impl SharedPlayer {
         };
 
         io.tx(&login).await?;
+
+        io.tx(&SetTickingStateC {
+            tick_rate: 20.0,
+            is_frozen: false,
+        })
+        .await?;
+
+        io.tx(&StepTicksC(10)).await?;
 
         drop(io);
 

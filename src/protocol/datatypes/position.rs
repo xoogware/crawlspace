@@ -17,7 +17,6 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-
 use bitfield_struct::bitfield;
 use byteorder::{BigEndian, WriteBytesExt};
 use color_eyre::eyre::Result;

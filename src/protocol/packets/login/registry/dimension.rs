@@ -17,9 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-
 use serde::{Deserialize, Serialize};
-
 
 use super::RegistryItem;
 

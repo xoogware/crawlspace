@@ -19,14 +19,15 @@
 
 use std::{collections::HashMap, fs::File, path::Path};
 
-use block_entity::BlockEntity;
 use color_eyre::eyre::Result;
 use fastanvil::Region;
 use rayon::prelude::*;
 use serde::Deserialize;
 
-mod block_entity;
+pub mod block_entity;
 pub mod blocks;
+
+pub use block_entity::*;
 
 #[derive(Clone, Debug)]
 pub struct World(pub HashMap<(i32, i32), Chunk>);
@@ -137,10 +138,6 @@ pub fn read_world(path: &str) -> Result<World> {
 
             if (-10..10).contains(&parsed.x_pos) && (-10..10).contains(&parsed.z_pos) {
                 parsed.sections.sort_by_key(|c| c.y);
-
-                parsed.block_entities.clone().into_iter().for_each(|e| {
-                    let _ = BlockEntity::try_parse(e);
-                });
 
                 debug!(
                     "Successfully parsed chunk at {}, {}",

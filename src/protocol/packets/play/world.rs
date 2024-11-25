@@ -59,7 +59,7 @@ pub struct ChunkDataUpdateLightC<'a> {
     /// Currently unused (no snow/rain/beacons anyway)
     heightmaps: HeightMaps,
     data: Vec<ChunkSection>,
-    entities: Vec<BlockEntity<'a>>,
+    entities: Vec<BlockEntity>,
     sky_light_mask: BitVec,
     block_light_mask: BitVec,
     empty_sky_light_mask: BitVec,
@@ -69,17 +69,36 @@ pub struct ChunkDataUpdateLightC<'a> {
 }
 
 #[derive(Debug)]
-#[expect(unused)]
-struct BlockEntity<'a> {
+struct BlockEntity {
     packed_xz: u8,
     y: i16,
     kind: VarInt,
-    data: &'a [u8],
+    data: Vec<u8>,
 }
 
-impl Encode for BlockEntity<'_> {
-    fn encode(&self, _w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
-        unimplemented!("Block entities are currently unsupported");
+impl Encode for BlockEntity {
+    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
+        self.packed_xz.encode(&mut w)?;
+        self.y.encode(&mut w)?;
+        self.kind.encode(&mut w)?;
+        self.data.encode(&mut w)?;
+
+        Ok(())
+    }
+}
+
+impl From<world::BlockEntity> for BlockEntity {
+    fn from(value: world::BlockEntity) -> Self {
+        let data = fastnbt::to_bytes_with_opts(&value.raw_data, fastnbt::SerOpts::network_nbt())
+            .expect("Failed to parse network nbt for block entity");
+
+        Self {
+            packed_xz: (((value.x & 15) << 4) | (value.z & 15)) as u8,
+            y: value.y as i16,
+            // FIXME: use correct block entity type from registry
+            kind: VarInt(7),
+            data,
+        }
     }
 }
 
@@ -328,12 +347,35 @@ impl ChunkDataUpdateLightC<'_> {
             .map(|sec| ChunkSection::anvil_to_sec(sec, block_states))
             .collect::<Vec<_>>();
 
+        let block_entities = value
+            .block_entities
+            .clone()
+            .into_iter()
+            .filter_map(|e| {
+                world::BlockEntity::try_parse(e).map_or_else(
+                    |why| {
+                        warn!(
+                            "Failed to parse block entity: {why}, ignoring in final chunk packet for ({}, {})",
+                            value.x_pos,
+                            value.z_pos,
+                        );
+                        None
+                    },
+                    |e| match e.keep_packed {
+                        true => None,
+                        false => Some(e)
+                    },
+                )
+            })
+            .map(Into::into)
+            .collect::<Vec<self::BlockEntity>>();
+
         Self {
             x: value.x_pos,
             z: value.z_pos,
             heightmaps: HeightMaps(HashMap::new()),
             data,
-            entities: vec![],
+            entities: block_entities,
             sky_light_mask: BitVec::from_elem(18, false),
             block_light_mask: BitVec::from_elem(18, false),
             empty_sky_light_mask: BitVec::from_elem(18, true),
