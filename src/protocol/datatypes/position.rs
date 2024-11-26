@@ -18,11 +18,11 @@
  */
 
 use bitfield_struct::bitfield;
-use byteorder::{BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use color_eyre::eyre::Result;
 use thiserror::Error;
 
-use crate::protocol::Encode;
+use crate::protocol::{Decode, Encode};
 
 #[derive(Debug)]
 pub struct Position {
@@ -70,10 +70,35 @@ impl TryFrom<&Position> for PackedPosition {
     }
 }
 
+impl From<PackedPosition> for Position {
+    fn from(value: PackedPosition) -> Self {
+        Self {
+            x: value.x(),
+            y: value.y(),
+            z: value.z(),
+        }
+    }
+}
+
 impl Encode for Position {
     fn encode(&self, w: impl std::io::Write) -> Result<()> {
         let encoded: PackedPosition = self.try_into()?;
         encoded.encode(w)
+    }
+}
+
+impl Decode<'_> for Position {
+    fn decode(r: &mut &'_ [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let bytes = r.read_i64::<BigEndian>()?;
+
+        Ok(Self {
+            x: (bytes >> 38) as i32,
+            y: (bytes << 52 >> 52) as i32,
+            z: (bytes << 26 >> 38) as i32,
+        })
     }
 }
 

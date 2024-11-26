@@ -39,7 +39,7 @@ use crate::{
                 ConfirmTeleportS, GameEvent, GameEventC, Gamemode, KeepAliveC, LoginPlayC,
                 PlayerInfoUpdateC, PlayerStatus, SetBorderCenterC, SetBorderSizeC, SetCenterChunkC,
                 SetPlayerPositionAndRotationS, SetPlayerPositionS, SetTickingStateC, StepTicksC,
-                SynchronisePositionC,
+                SynchronisePositionC, UseItemOnS,
             },
         },
         Frame, Packet, PacketState,
@@ -504,6 +504,11 @@ impl SharedPlayer {
                 ConfirmTeleportS::ID => {
                     let packet: ConfirmTeleportS = frame.decode()?;
                     self.check_teleports(Some(packet)).await?;
+                }
+
+                UseItemOnS::ID => {
+                    let packet: UseItemOnS = frame.decode()?;
+                    debug!("{:?}", packet);
                 }
 
                 id => {

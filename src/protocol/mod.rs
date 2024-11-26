@@ -47,6 +47,7 @@ pub mod packets {
 
     pub mod play {
         mod game_event;
+        mod interactions;
         mod keepalive;
         mod login;
         mod position;
@@ -56,6 +57,7 @@ pub mod packets {
         mod world;
 
         pub use game_event::*;
+        pub use interactions::*;
         pub use keepalive::*;
         pub use login::*;
         pub use position::*;
