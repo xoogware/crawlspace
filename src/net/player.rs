@@ -318,11 +318,12 @@ impl SharedPlayer {
         io.tx(&SetBorderSizeC(state.border_radius as f64 * 2.0))
             .await?;
 
-        let player_add = PlayerInfoUpdateC {
-            players: &[PlayerStatus::for_player(self.uuid().await).add_player("AFK", &[])],
-        };
-
-        io.tx(&player_add).await?;
+        io.tx(&PlayerInfoUpdateC {
+            players: &[PlayerStatus::for_player(self.uuid().await)
+                .add_player("You're alone...", &[])
+                .update_listed(true)],
+        })
+        .await?;
 
         let await_chunks = GameEventC::from(GameEvent::StartWaitingForLevelChunks);
         io.tx(&await_chunks).await?;
