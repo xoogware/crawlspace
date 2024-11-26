@@ -19,7 +19,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{bail, Result};
 use rand::Rng;
 use serde_json::json;
 use thiserror::Error;
@@ -50,7 +50,7 @@ use crate::{
 #[cfg(feature = "encryption")]
 use crate::protocol::{datatypes::Bytes, packets::login::PluginRequestC};
 
-use super::io::NetIo;
+use super::{entity::Entity, io::NetIo};
 
 #[derive(Debug)]
 pub struct Player {
@@ -62,14 +62,16 @@ pub struct Player {
     packet_state: RwLock<PacketState>,
 
     uuid: RwLock<Option<Uuid>>,
-    tp_state: Mutex<TeleportState>,
+    tp_state: RwLock<TeleportState>,
 
     last_keepalive: RwLock<Instant>,
+
+    entity: RwLock<Entity>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum TeleportState {
-    Pending(i32),
+    Pending(i32, Instant),
     Clear,
 }
 
@@ -92,10 +94,12 @@ impl SharedPlayer {
             crawlstate,
             packet_state: RwLock::new(PacketState::Handshaking),
 
-            tp_state: Mutex::new(TeleportState::Clear),
             uuid: RwLock::new(None),
+            tp_state: RwLock::new(TeleportState::Clear),
 
             last_keepalive: RwLock::new(Instant::now()),
+
+            entity: RwLock::new(Entity::default()),
         }))
     }
 
@@ -339,7 +343,6 @@ impl SharedPlayer {
         // thread but realistically who knows burhhhh
         state.player_send.send(self.clone()).await?;
 
-        state.shutdown_token.cancelled().await;
         Ok(())
     }
 
@@ -392,17 +395,6 @@ impl SharedPlayer {
         Ok(())
     }
 
-    async fn confirm_teleport(&self, id: i32) -> Result<(), TeleportError> {
-        let tp_state = self.0.tp_state.lock().await;
-        match *tp_state {
-            TeleportState::Clear => Err(TeleportError::Unexpected),
-            TeleportState::Pending(expected) => match id == expected {
-                true => Ok(()),
-                false => Err(TeleportError::WrongId(expected, id)),
-            },
-        }
-    }
-
     pub async fn uuid(&self) -> Uuid {
         let uuid = self.0.uuid.read().await;
         uuid.expect("uuid() called on uninitialized player - only call this after login!")
@@ -416,20 +408,30 @@ impl SharedPlayer {
         yaw: f32,
         pitch: f32,
     ) -> Result<()> {
+        {
+            let tp_state = self.0.tp_state.read().await;
+            if *tp_state != TeleportState::Clear {
+                bail!("Player {} already has a teleport pending", self.0.id);
+            };
+        }
+
         let mut io = self.0.io.lock().await;
 
         let tp = SynchronisePositionC::new(x, y, z, yaw, pitch);
         {
-            let mut tp_state = self.0.tp_state.lock().await;
+            let mut tp_state = self.0.tp_state.write().await;
             // player will be given 5 (FIVE) SECONDS TO ACK!!!!!
-            *tp_state = TeleportState::Pending(tp.id);
+            *tp_state = TeleportState::Pending(tp.id, Instant::now());
         }
         io.tx(&tp).await?;
 
         let tp_ack = io.rx::<ConfirmTeleportS>().await?;
 
         match tokio::time::timeout(Duration::from_secs(5), self.confirm_teleport(tp_ack.id)).await {
-            Ok(Ok(())) => (),
+            Ok(Ok(())) => {
+                let mut tp_state = self.0.tp_state.write().await;
+                *tp_state = TeleportState::Clear;
+            }
             Ok(Err(why)) => {
                 warn!("Spawning player {} failed: {why}", self.0.id);
                 Err(why)?;
@@ -442,23 +444,66 @@ impl SharedPlayer {
         Ok(())
     }
 
+    async fn confirm_teleport(&self, id: i32) -> Result<(), TeleportError> {
+        let tp_state = self.0.tp_state.read().await;
+        match *tp_state {
+            TeleportState::Clear => Err(TeleportError::Unexpected),
+            TeleportState::Pending(expected, _) if id == expected => Ok(()),
+            TeleportState::Pending(expected, _) => Err(TeleportError::WrongId(expected, id)),
+        }
+    }
+
+    pub async fn check_teleports(
+        &self,
+        ack: Option<ConfirmTeleportS>,
+    ) -> Result<(), TeleportError> {
+        let tp_state = self.0.tp_state.read().await;
+
+        match *tp_state {
+            TeleportState::Pending(pending_id, sent_at) => {
+                if Instant::now() - sent_at > Duration::from_secs(5) {
+                    return Err(TeleportError::TimedOut);
+                }
+
+                match ack {
+                    Some(ack) if ack.id == pending_id => {
+                        drop(tp_state);
+                        let mut tp_state = self.0.tp_state.write().await;
+                        *tp_state = TeleportState::Clear;
+                        Ok(())
+                    }
+                    Some(ack) => Err(TeleportError::WrongId(ack.id, pending_id)),
+                    None => Err(TeleportError::Pending(pending_id)),
+                }
+            }
+            TeleportState::Clear => match ack {
+                None => Ok(()),
+                Some(_) => Err(TeleportError::Unexpected),
+            },
+        }
+    }
+
     async fn handle_frames(&self, frames: Vec<Frame>) -> Result<()> {
         for frame in frames {
             match frame.id {
                 SetPlayerPositionS::ID => {
                     let packet: SetPlayerPositionS = frame.decode()?;
-                    debug!(
-                        "Player {} moved to {}, {}, {}",
-                        self.0.id, packet.x, packet.feet_y, packet.z
-                    );
+
+                    let mut entity = self.0.entity.write().await;
+                    entity.reposition(packet.x, packet.feet_y, packet.z);
                 }
 
                 SetPlayerPositionAndRotationS::ID => {
                     let packet: SetPlayerPositionAndRotationS = frame.decode()?;
-                    debug!(
-                        "Player {} moved to {}, {}, {} rotated {} {}",
-                        self.0.id, packet.x, packet.feet_y, packet.z, packet.pitch, packet.yaw
-                    );
+
+                    let mut entity = self.0.entity.write().await;
+                    entity.reposition(packet.x, packet.feet_y, packet.z);
+                    entity.rotate(packet.yaw, packet.pitch);
+                }
+
+                ConfirmTeleportS::ID => {
+                    let packet: ConfirmTeleportS = frame.decode()?;
+                    self.check_teleports(Some(packet)).await?;
                 }
 
                 id => {
@@ -475,9 +520,13 @@ impl SharedPlayer {
 }
 
 #[derive(Debug, Error)]
-enum TeleportError {
+pub enum TeleportError {
     #[error("Client was not expecting a teleport acknowledgement")]
     Unexpected,
     #[error("Teleport ack has wrong ID (expected {0}, got {1})")]
     WrongId(i32, i32),
+    #[error("Teleport timed out")]
+    TimedOut,
+    #[error("Waiting for teleport acknowledgement for id {0}")]
+    Pending(i32),
 }

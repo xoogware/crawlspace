@@ -24,6 +24,7 @@ use tokio::net::TcpListener;
 pub mod cache;
 pub mod player;
 
+mod entity;
 mod io;
 
 use crate::CrawlState;

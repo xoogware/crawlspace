@@ -19,12 +19,15 @@
 
 pub mod ticker;
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use color_eyre::eyre::Result;
 
 use crate::{
-    net::{cache::WorldCache, player::SharedPlayer},
+    net::{
+        cache::WorldCache,
+        player::{SharedPlayer, TeleportError},
+    },
     CrawlState,
 };
 
@@ -35,7 +38,7 @@ pub struct Server {
     pub ticker: Ticker,
 
     world_cache: Arc<WorldCache>,
-    players: Vec<SharedPlayer>,
+    players: HashMap<u16, SharedPlayer>,
 
     crawlstate: CrawlState,
 }
@@ -46,7 +49,7 @@ impl Server {
         Server {
             ticker: Ticker::new(tick_rate),
             world_cache: Arc::new(world_cache),
-            players: Vec::new(),
+            players: HashMap::new(),
             crawlstate: state,
         }
     }
@@ -56,13 +59,28 @@ impl Server {
         let mut player_recv = state.player_recv.lock().await;
 
         while let Ok(p) = player_recv.try_recv() {
-            self.players.push(p.clone());
+            self.players.insert(p.0.id, p.clone());
             tokio::spawn(Self::send_world_to(p.clone(), self.world_cache.clone()));
         }
 
-        for player in &self.players {
+        let mut invalid_players: Vec<u16> = Vec::new();
+
+        for (id, player) in &self.players {
             let _ = player.keepalive().await;
             let _ = player.handle_all_packets().await;
+
+            match player.check_teleports(None).await {
+                Err(TeleportError::TimedOut) | Err(TeleportError::WrongId(..)) => {
+                    warn!("Player {} teleport failed, removing", player.0.id);
+                    invalid_players.push(*id);
+                }
+                _ => (),
+            }
+        }
+
+        for id in invalid_players {
+            // TODO: kick player properly
+            self.players.remove(&id);
         }
     }
 
