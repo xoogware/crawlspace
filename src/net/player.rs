@@ -558,19 +558,33 @@ impl SharedPlayer {
     }
 
     async fn handle_use_item(&self, packet: UseItemOnS) -> Result<()> {
-        let id = self.0.next_window_id.fetch_add(1, Ordering::Relaxed);
+        let crawlstate = self.0.crawlstate.clone();
+        let server = crawlstate.get_server().await;
 
-        let window = Window {
-            id,
-            kind: WindowType::Generic9x3,
-            title: "Hi".into(),
-        };
+        let x = packet.location.x as i32;
+        let y = packet.location.y as i32;
+        let z = packet.location.z as i32;
 
-        self.0.io.tx(&OpenScreenC::from(&window)).await?;
+        debug!("Player {} clicked at {}, {}, {}", self.id(), x, y, z);
 
-        {
-            let mut sw = self.0.window.write().await;
-            *sw = Some(window);
+        match server.get_container(x, y, z) {
+            None => (),
+            Some(container) => {
+                let id = self.0.next_window_id.fetch_add(1, Ordering::Relaxed);
+
+                let window = Window {
+                    id,
+                    kind: WindowType::Generic9x3,
+                    title: "Hi".into(),
+                };
+
+                self.0.io.tx(&OpenScreenC::from(&window)).await?;
+
+                {
+                    let mut sw = self.0.window.write().await;
+                    *sw = Some(window);
+                }
+            }
         }
 
         Ok(())

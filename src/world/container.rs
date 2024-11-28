@@ -17,5 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use crate::protocol::datatypes::Slot;
+
 #[derive(Debug, Clone)]
-pub struct Slot;
+pub struct Container(pub Vec<Slot>);

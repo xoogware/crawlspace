@@ -26,8 +26,10 @@ use serde::Deserialize;
 
 pub mod block_entity;
 pub mod blocks;
+pub mod container;
 
 pub use block_entity::*;
+pub use container::*;
 
 #[derive(Clone, Debug)]
 pub struct World(pub HashMap<(i32, i32), Chunk>);

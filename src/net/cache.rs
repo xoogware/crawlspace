@@ -17,7 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::HashMap};
 
 use rayon::prelude::*;
 
@@ -30,17 +30,18 @@ use crate::{
         },
         Encoder,
     },
-    world::{blocks::Blocks, World},
+    world::{blocks::Blocks, BlockEntity, Container, World},
     CrawlState,
 };
 
 #[derive(Debug)]
 pub struct WorldCache {
     pub encoded: Vec<Vec<u8>>,
+    pub containers: HashMap<(i32, i32, i32), Container>,
 }
 
 impl WorldCache {
-    pub fn from_anvil(crawlstate: CrawlState, world: World) -> Self {
+    pub fn from_anvil(crawlstate: CrawlState, world: &World) -> Self {
         let mut chunks = world.0.iter().collect::<Vec<_>>();
 
         chunks.sort_by(|((ax, az), _), ((bx, bz), _)| {
@@ -53,23 +54,72 @@ impl WorldCache {
 
         let block_states = Blocks::new();
 
-        let chunks = chunks
-            .par_iter()
-            .map(|(_, c)| ChunkDataUpdateLightC::new(crawlstate.clone(), c, &block_states))
-            .collect::<Vec<ChunkDataUpdateLightC<'_>>>();
+        let containers = chunks
+            .iter()
+            .map(|(_, c)| {
+                c.block_entities
+                    .iter()
+                    .filter_map(|block_entity| {
+                        // TODO: cache this somewhere so block entities aren't parsed twice on startup
+                        let block_entity = BlockEntity::try_parse((*block_entity).clone())
+                            .map_or_else(
+                                |why| {
+                                    warn!(
+                                        "Failed to parse block entity: {why}, ignoring in container cache for ({}, {})",
+                                        c.x_pos,
+                                        c.z_pos,
+                                    );
+                                    None
+                                },
+                                |e| match e.keep_packed {
+                                    true => None,
+                                    false => Some(e),
+                                },
+                            );
+
+                        let Some(block_entity) = block_entity else {
+                            return None;
+                        };
+
+                        match block_entity.id.as_str() {
+                            "minecraft:chest" | "minecraft:trapped_chest" | "minecraft:barrel" => {
+                                Some(block_entity)
+                            }
+                            _ => None,
+                        }
+                    })
+                    .map(|container| {
+                        (
+                            (container.x, container.y, container.z),
+                            Container(Vec::new()),
+                        )
+                    })
+                    .collect::<Vec<((i32, i32, i32), Container)>>()
+            })
+            .flatten()
+            .collect();
+
+        info!("Containers: {:?}", containers);
 
         let encoded = chunks
             .par_iter()
-            .map(|chunk| {
+            .map(|(_, chunk)| {
                 let mut encoder = Encoder::new();
                 encoder
-                    .append_packet(chunk)
+                    .append_packet(&ChunkDataUpdateLightC::new(
+                        crawlstate.clone(),
+                        chunk,
+                        &block_states,
+                    ))
                     .expect("Failed to append packet to encoder");
                 encoder.take().to_vec()
             })
             .collect();
 
-        Self { encoded }
+        Self {
+            encoded,
+            containers,
+        }
     }
 }
 

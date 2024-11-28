@@ -38,7 +38,6 @@ pub struct NetIo {
     pub connected: RwLock<bool>,
     read_half: Mutex<OwnedReadHalf>,
     write_half: Mutex<OwnedWriteHalf>,
-    frame: Mutex<Frame>,
     decoder: Mutex<protocol::Decoder>,
     encoder: Mutex<protocol::Encoder>,
 }
@@ -67,10 +66,6 @@ impl NetIo {
             connected: RwLock::new(true),
             read_half: Mutex::new(read_half),
             write_half: Mutex::new(write_half),
-            frame: Mutex::new(Frame {
-                id: -1,
-                body: BytesMut::new(),
-            }),
             decoder: Mutex::new(protocol::Decoder::new()),
             encoder: Mutex::new(protocol::Encoder::new()),
         }
@@ -100,6 +95,8 @@ impl NetIo {
                         continue;
                     }
 
+                    // TODO: decode here, rather than forcing the consumer to do it.
+                    // probably need to box frame data? idk enough rust for this
                     return Ok(frame);
                 };
 

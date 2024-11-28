@@ -22,7 +22,7 @@ use std::{fs::OpenOptions, sync::Arc};
 use args::Args;
 use clap::Parser;
 use color_eyre::eyre::Result;
-use net::cache::WorldCache;
+use net::cache::{RegistryCache, WorldCache};
 use server::Server;
 use tracing_subscriber::{layer::SubscriberExt, prelude::*, EnvFilter};
 use world::read_world;
@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
     let state = Arc::new(state::State::new(VERSION, VERSION_NUM, args));
 
     info!("Generating world chunk packets");
-    let world_cache = WorldCache::from_anvil(state.clone(), world);
+    let world_cache = WorldCache::from_anvil(state.clone(), &world);
     info!("Done.");
 
     #[cfg(feature = "lan")]

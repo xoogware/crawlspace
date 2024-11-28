@@ -19,13 +19,14 @@
 
 use std::sync::{atomic::AtomicUsize, Arc};
 
-use tokio::sync::{mpsc, Mutex, Semaphore};
+use tokio::sync::{mpsc, Mutex, RwLock, Semaphore};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     args::Args,
     net::{cache::RegistryCache, player::SharedPlayer},
     protocol::packets::login::registry::ALL_REGISTRIES,
+    server::Server,
 };
 
 #[derive(Debug)]
@@ -49,6 +50,8 @@ pub struct State {
 
     pub spawnpoint: (f64, f64, f64),
     pub border_radius: i32,
+
+    server: RwLock<Option<Arc<Server>>>,
 }
 
 impl State {
@@ -83,6 +86,20 @@ impl State {
 
             spawnpoint: (args.spawn_x, args.spawn_y, args.spawn_z),
             border_radius: args.border_radius,
+
+            server: RwLock::new(None),
         }
+    }
+
+    pub async fn set_server(&self, server: Arc<Server>) {
+        let mut write = self.server.write().await;
+        *write = Some(server);
+    }
+
+    pub async fn get_server(&self) -> Arc<Server> {
+        let server = self.server.read().await;
+        server
+            .clone()
+            .expect("state.get_server called before server initialized")
     }
 }

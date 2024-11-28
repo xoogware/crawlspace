@@ -23,9 +23,13 @@ pub mod window;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
+    time::Duration,
 };
 
 use color_eyre::eyre::Result;
+
+use tokio::sync::Mutex;
+
 #[cfg(feature = "timings")]
 use tokio::time::Instant;
 
@@ -34,6 +38,7 @@ use crate::{
         cache::WorldCache,
         player::{SharedPlayer, TeleportError},
     },
+    world::{Container, World},
     CrawlState,
 };
 
@@ -44,37 +49,45 @@ pub struct Server {
     pub ticker: Ticker,
 
     world_cache: Arc<WorldCache>,
-    players: HashMap<u16, SharedPlayer>,
+    players: Mutex<HashMap<u16, SharedPlayer>>,
 
     crawlstate: CrawlState,
 }
 
 impl Server {
     #[must_use]
-    pub fn new(state: CrawlState, world_cache: WorldCache, tick_rate: u8) -> Self {
-        Server {
+    pub fn new(state: CrawlState, world_cache: WorldCache, tick_rate: u8) -> Arc<Self> {
+        let server = Arc::new(Server {
             ticker: Ticker::new(tick_rate),
             world_cache: Arc::new(world_cache),
-            players: HashMap::new(),
-            crawlstate: state,
-        }
+            players: Mutex::new(HashMap::new()),
+            crawlstate: state.clone(),
+        });
+
+        let state_server = server.clone();
+        tokio::spawn(async move {
+            state.set_server(state_server).await;
+        });
+
+        server
     }
 
-    async fn tick(&mut self) {
+    async fn tick(&self) {
         #[cfg(feature = "timings")]
         let run_start = Instant::now();
 
         let state = self.crawlstate.clone();
         let mut player_recv = state.player_recv.lock().await;
 
+        let mut players = self.players.lock().await;
         while let Ok(p) = player_recv.try_recv() {
-            self.players.insert(p.0.id, p.clone());
+            players.insert(p.0.id, p.clone());
             tokio::spawn(Self::send_world_to(p.clone(), self.world_cache.clone()));
         }
 
         let mut invalid_players: HashSet<u16> = HashSet::new();
 
-        for (id, player) in &self.players {
+        for (id, player) in &*players {
             let _ = player.keepalive().await;
 
             match player.handle_all_packets().await {
@@ -103,13 +116,12 @@ impl Server {
 
         for id in invalid_players {
             // TODO: kick player properly
-            self.players.remove(&id);
+            players.remove(&id);
         }
 
         #[cfg(feature = "timings")]
         {
             let run_end = Instant::now();
-            debug!("Tick took {}ms", (run_start - run_end).as_millis());
             debug!("Tick took {}ms", (run_end - run_start).as_millis());
         }
     }
@@ -120,5 +132,9 @@ impl Server {
         }
 
         Ok(())
+    }
+
+    pub fn get_container(&self, x: i32, y: i32, z: i32) -> Option<Container> {
+        self.world_cache.containers.get(&(x, y, z)).cloned()
     }
 }
