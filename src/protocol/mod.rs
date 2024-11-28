@@ -20,12 +20,16 @@
 pub mod datatypes {
     mod impls;
     mod position;
+    mod slot;
     mod string;
+    mod text_component;
     mod variable;
 
     pub use impls::*;
     pub use position::*;
+    pub use slot::*;
     pub use string::*;
+    pub use text_component::*;
     pub use variable::*;
 }
 
@@ -46,6 +50,7 @@ pub mod packets {
     }
 
     pub mod play {
+        mod container;
         mod game_event;
         mod interactions;
         mod keepalive;
@@ -56,6 +61,7 @@ pub mod packets {
         mod tick;
         mod world;
 
+        pub use container::*;
         pub use game_event::*;
         pub use interactions::*;
         pub use keepalive::*;

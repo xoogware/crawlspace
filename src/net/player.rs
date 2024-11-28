@@ -17,7 +17,13 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use color_eyre::eyre::{bail, Result};
 use rand::Rng;
@@ -37,13 +43,14 @@ use crate::{
             login::*,
             play::{
                 ConfirmTeleportS, GameEvent, GameEventC, Gamemode, KeepAliveC, LoginPlayC,
-                PlayerInfoUpdateC, PlayerStatus, SetBorderCenterC, SetBorderSizeC, SetCenterChunkC,
-                SetPlayerPositionAndRotationS, SetPlayerPositionS, SetTickingStateC, StepTicksC,
-                SynchronisePositionC, UseItemOnS,
+                OpenScreenC, PlayerInfoUpdateC, PlayerStatus, SetBorderCenterC, SetBorderSizeC,
+                SetCenterChunkC, SetPlayerPositionAndRotationS, SetPlayerPositionS,
+                SetTickingStateC, StepTicksC, SynchronisePositionC, UseItemOnS,
             },
         },
         Frame, Packet, PacketState,
     },
+    server::window::{Window, WindowType},
     CrawlState,
 };
 
@@ -67,6 +74,9 @@ pub struct Player {
     last_keepalive: RwLock<Instant>,
 
     entity: RwLock<Entity>,
+
+    next_window_id: AtomicU8,
+    window: RwLock<Option<Window>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -100,6 +110,9 @@ impl SharedPlayer {
             last_keepalive: RwLock::new(Instant::now()),
 
             entity: RwLock::new(Entity::default()),
+
+            next_window_id: AtomicU8::new(0),
+            window: RwLock::new(None),
         }))
     }
 
@@ -347,7 +360,11 @@ impl SharedPlayer {
     }
 
     pub async fn handle_all_packets(&self) -> Result<()> {
-        let packets = self.rx_all().await;
+        let Some(packets) = self.rx_all().await else {
+            bail!("Connection for player {} was closed", self.id())
+        };
+
+        debug!("player {} {:?}", self.id(), packets);
         self.handle_frames(packets).await
     }
 
@@ -375,20 +392,26 @@ impl SharedPlayer {
         }
     }
 
-    async fn rx_all(&self) -> Vec<Frame> {
+    async fn rx_all(&self) -> Option<Vec<Frame>> {
         let mut io = self.0.io.lock().await;
 
         let mut frames = Vec::new();
-        while let Ok(frame) = io.rx_raw().await {
-            frames.push(frame);
+
+        loop {
+            match io.rx_raw().await {
+                Ok(frame) => frames.push(frame),
+                Err(why) => match why.downcast_ref::<tokio::io::Error>().map(|e| e.kind()) {
+                    Some(tokio::io::ErrorKind::UnexpectedEof) => return None,
+                    _ => break,
+                },
+            }
         }
 
-        frames
+        Some(frames)
     }
 
     async fn ping(&self, id: i64) -> Result<()> {
         let mut io = self.0.io.lock().await;
-        io.flush().await?;
         let ka = KeepAliveC(id);
         io.tx(&ka).await?;
         // TODO: check return keepalive, kick
@@ -489,16 +512,28 @@ impl SharedPlayer {
                 SetPlayerPositionS::ID => {
                     let packet: SetPlayerPositionS = frame.decode()?;
 
-                    let mut entity = self.0.entity.write().await;
-                    entity.reposition(packet.x, packet.feet_y, packet.z);
+                    let tp_state = self.0.tp_state.read().await;
+                    match *tp_state {
+                        TeleportState::Clear => {
+                            let mut entity = self.0.entity.write().await;
+                            entity.reposition(packet.x, packet.feet_y, packet.z);
+                        }
+                        _ => (),
+                    }
                 }
 
                 SetPlayerPositionAndRotationS::ID => {
                     let packet: SetPlayerPositionAndRotationS = frame.decode()?;
 
-                    let mut entity = self.0.entity.write().await;
-                    entity.reposition(packet.x, packet.feet_y, packet.z);
-                    entity.rotate(packet.yaw, packet.pitch);
+                    let tp_state = self.0.tp_state.read().await;
+                    match *tp_state {
+                        TeleportState::Clear => {
+                            let mut entity = self.0.entity.write().await;
+                            entity.reposition(packet.x, packet.feet_y, packet.z);
+                            entity.rotate(packet.yaw, packet.pitch);
+                        }
+                        _ => (),
+                    }
                 }
 
                 ConfirmTeleportS::ID => {
@@ -508,7 +543,7 @@ impl SharedPlayer {
 
                 UseItemOnS::ID => {
                     let packet: UseItemOnS = frame.decode()?;
-                    debug!("{:?}", packet);
+                    self.handle_use_item(packet).await?;
                 }
 
                 id => {
@@ -518,6 +553,28 @@ impl SharedPlayer {
                     );
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_use_item(&self, packet: UseItemOnS) -> Result<()> {
+        let id = self.0.next_window_id.fetch_add(1, Ordering::Relaxed);
+
+        let window = Window {
+            id,
+            kind: WindowType::Generic9x3,
+            title: "Hi".into(),
+        };
+
+        {
+            let mut io = self.0.io.lock().await;
+            io.tx(&OpenScreenC::from(&window)).await?;
+        }
+
+        {
+            let mut sw = self.0.window.write().await;
+            *sw = Some(window);
         }
 
         Ok(())

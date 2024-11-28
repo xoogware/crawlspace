@@ -18,10 +18,12 @@
  */
 
 pub mod ticker;
+pub mod window;
 
 use std::{collections::HashMap, sync::Arc};
 
 use color_eyre::eyre::Result;
+use tokio::time::Instant;
 
 use crate::{
     net::{
@@ -55,6 +57,9 @@ impl Server {
     }
 
     async fn tick(&mut self) {
+        #[cfg(feature = "timings")]
+        let run_start = Instant::now();
+
         let state = self.crawlstate.clone();
         let mut player_recv = state.player_recv.lock().await;
 
@@ -67,7 +72,15 @@ impl Server {
 
         for (id, player) in &self.players {
             let _ = player.keepalive().await;
-            let _ = player.handle_all_packets().await;
+
+            match player.handle_all_packets().await {
+                Ok(()) => (),
+                Err(why) => {
+                    error!("error handling packets for player {}: {why}", player.id());
+                    invalid_players.push(*id);
+                    continue;
+                }
+            }
 
             match player.check_teleports(None).await {
                 Err(TeleportError::TimedOut) | Err(TeleportError::WrongId(..)) => {
@@ -81,6 +94,12 @@ impl Server {
         for id in invalid_players {
             // TODO: kick player properly
             self.players.remove(&id);
+        }
+
+        #[cfg(feature = "timings")]
+        {
+            let run_end = Instant::now();
+            debug!("Tick took {}ms", (run_start - run_end).as_millis());
         }
     }
 

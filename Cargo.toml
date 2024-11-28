@@ -50,5 +50,6 @@ compression = []
 encryption = ["dep:cfb8", "dep:aes"]
 modern_art = []
 lan = []
+timings = []
 
 full = ["compression", "encryption"]
