@@ -27,7 +27,7 @@ pub mod datatypes {
 
     pub use impls::*;
     pub use position::*;
-    pub use slot::*;
+    
     pub use string::*;
     pub use text_component::*;
     pub use variable::*;

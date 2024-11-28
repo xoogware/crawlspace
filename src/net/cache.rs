@@ -17,7 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::{cmp::Ordering, sync::Arc};
+use std::cmp::Ordering;
 
 use rayon::prelude::*;
 

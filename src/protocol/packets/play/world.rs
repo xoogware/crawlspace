@@ -17,7 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use bit_vec::BitVec;
 use bytes::BufMut;

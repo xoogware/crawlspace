@@ -86,7 +86,7 @@ impl Server {
             }
 
             {
-                if player.0.io.connected().await == false {
+                if !player.0.io.connected().await {
                     invalid_players.insert(*id);
                 }
             }

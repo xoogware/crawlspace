@@ -32,9 +32,8 @@ use thiserror::Error;
 use tokio::{
     net::TcpStream,
     sync::{Mutex, OwnedSemaphorePermit, RwLock},
-    time::{self, timeout, Instant},
+    time::{timeout, Instant},
 };
-use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::{
@@ -271,8 +270,7 @@ impl SharedPlayer {
             data: Bounded(Bytes(&[3])),
         };
 
-        let mut io = self.0.io.lock().await;
-        io.tx(&req).await?;
+        self.0.io.tx(&req).await?;
 
         Ok(())
     }
@@ -503,10 +501,13 @@ impl SharedPlayer {
                         let mut queue = player.0.frame_queue.lock().await;
                         queue.push(frame);
                     }
-                    Err(why) => match why.downcast_ref::<tokio::io::Error>().map(|e| e.kind()) {
-                        Some(tokio::io::ErrorKind::UnexpectedEof) => return,
-                        _ => (),
-                    },
+                    Err(why) => {
+                        if let Some(tokio::io::ErrorKind::UnexpectedEof) =
+                            why.downcast_ref::<tokio::io::Error>().map(|e| e.kind())
+                        {
+                            return;
+                        }
+                    }
                 }
             }
         });
@@ -518,12 +519,9 @@ impl SharedPlayer {
                 let packet: SetPlayerPositionS = frame.decode()?;
 
                 let tp_state = self.0.tp_state.read().await;
-                match *tp_state {
-                    TeleportState::Clear => {
-                        let mut entity = self.0.entity.write().await;
-                        entity.reposition(packet.x, packet.feet_y, packet.z);
-                    }
-                    _ => (),
+                if *tp_state == TeleportState::Clear {
+                    let mut entity = self.0.entity.write().await;
+                    entity.reposition(packet.x, packet.feet_y, packet.z);
                 }
             }
 
@@ -531,13 +529,10 @@ impl SharedPlayer {
                 let packet: SetPlayerPositionAndRotationS = frame.decode()?;
 
                 let tp_state = self.0.tp_state.read().await;
-                match *tp_state {
-                    TeleportState::Clear => {
-                        let mut entity = self.0.entity.write().await;
-                        entity.reposition(packet.x, packet.feet_y, packet.z);
-                        entity.rotate(packet.yaw, packet.pitch);
-                    }
-                    _ => (),
+                if *tp_state == TeleportState::Clear {
+                    let mut entity = self.0.entity.write().await;
+                    entity.reposition(packet.x, packet.feet_y, packet.z);
+                    entity.rotate(packet.yaw, packet.pitch);
                 }
             }
 
