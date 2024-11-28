@@ -26,6 +26,7 @@ use std::{
 };
 
 use color_eyre::eyre::Result;
+#[cfg(feature = "timings")]
 use tokio::time::Instant;
 
 use crate::{
@@ -109,6 +110,7 @@ impl Server {
         {
             let run_end = Instant::now();
             debug!("Tick took {}ms", (run_start - run_end).as_millis());
+            debug!("Tick took {}ms", (run_end - run_start).as_millis());
         }
     }
 
