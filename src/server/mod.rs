@@ -20,7 +20,10 @@
 pub mod ticker;
 pub mod window;
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use color_eyre::eyre::Result;
 use tokio::time::Instant;
@@ -68,7 +71,7 @@ impl Server {
             tokio::spawn(Self::send_world_to(p.clone(), self.world_cache.clone()));
         }
 
-        let mut invalid_players: Vec<u16> = Vec::new();
+        let mut invalid_players: HashSet<u16> = HashSet::new();
 
         for (id, player) in &self.players {
             let _ = player.keepalive().await;
@@ -77,15 +80,21 @@ impl Server {
                 Ok(()) => (),
                 Err(why) => {
                     error!("error handling packets for player {}: {why}", player.id());
-                    invalid_players.push(*id);
+                    invalid_players.insert(*id);
                     continue;
+                }
+            }
+
+            {
+                if player.0.io.connected().await == false {
+                    invalid_players.insert(*id);
                 }
             }
 
             match player.check_teleports(None).await {
                 Err(TeleportError::TimedOut) | Err(TeleportError::WrongId(..)) => {
                     warn!("Player {} teleport failed, removing", player.0.id);
-                    invalid_players.push(*id);
+                    invalid_players.insert(*id);
                 }
                 _ => (),
             }
@@ -104,10 +113,8 @@ impl Server {
     }
 
     async fn send_world_to(player: SharedPlayer, world_cache: Arc<WorldCache>) -> Result<()> {
-        let mut io = player.0.io.lock().await;
-
         for packet in world_cache.encoded.iter() {
-            io.tx_raw(packet).await?;
+            player.0.io.tx_raw(packet).await?;
         }
 
         Ok(())

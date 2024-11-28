@@ -34,6 +34,7 @@ use tokio::{
     sync::{Mutex, OwnedSemaphorePermit, RwLock},
     time::{self, timeout, Instant},
 };
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::{
@@ -63,7 +64,8 @@ use super::{entity::Entity, io::NetIo};
 pub struct Player {
     pub id: u16,
     _permit: OwnedSemaphorePermit,
-    pub io: Mutex<NetIo>,
+    pub io: NetIo,
+    frame_queue: Mutex<Vec<Frame>>,
 
     crawlstate: CrawlState,
     packet_state: RwLock<PacketState>,
@@ -98,7 +100,8 @@ impl SharedPlayer {
     ) -> Self {
         Self(Arc::new(Player {
             id,
-            io: Mutex::new(NetIo::new(connection)),
+            io: NetIo::new(connection),
+            frame_queue: Mutex::new(Vec::new()),
             _permit: permit,
 
             crawlstate,
@@ -123,11 +126,10 @@ impl SharedPlayer {
 
     pub async fn connect(&self) {
         {
-            let io = self.0.io.lock().await;
-            let addy = io
-                .peer_addr()
-                .map_or("Unknown".to_string(), |a| a.to_string());
-            debug!("Handling new player (id {}) from {}", self.0.id, addy);
+            debug!(
+                "Handling new player (id {}) from {}",
+                self.0.id, self.0.io.peer_addr
+            );
         }
 
         // crawlspace intentionally doesn't support legacy pings :3
@@ -156,9 +158,9 @@ impl SharedPlayer {
 
     async fn handshake(&self) -> Result<()> {
         let state = self.0.crawlstate.clone();
-        let mut io = self.0.io.lock().await;
 
-        let p = io.rx::<HandshakeS>().await?;
+        let p = self.0.io.rx::<HandshakeS>().await?;
+        let p = p.decode::<HandshakeS>()?;
 
         if p.protocol_version.0 != state.version_number {
             warn!(
@@ -168,7 +170,6 @@ impl SharedPlayer {
         }
 
         let next_state = p.next_state;
-        drop(io);
 
         let mut s = self.0.packet_state.write().await;
         match next_state {
@@ -189,9 +190,7 @@ impl SharedPlayer {
     }
 
     async fn handle_status(&self) -> Result<()> {
-        let mut io = self.0.io.lock().await;
-
-        io.rx::<StatusRequestS>().await?;
+        self.0.io.rx::<StatusRequestS>().await?;
         let state = self.0.crawlstate.clone();
 
         let res = json!({
@@ -213,18 +212,19 @@ impl SharedPlayer {
             json_respose: &res.to_string(),
         };
 
-        io.tx(&res).await?;
-        let ping = io.rx::<Ping>().await?;
-        io.tx(&ping).await?;
+        self.0.io.tx(&res).await?;
+        let ping: Ping = self.0.io.rx::<Ping>().await?.decode()?;
+
+        self.0.io.tx(&ping).await?;
 
         Ok(())
     }
 
     async fn login(&self) -> Result<()> {
         let state = self.0.crawlstate.clone();
-        let mut io = self.0.io.lock().await;
 
-        let login = io.rx::<LoginStartS>().await?;
+        let login = self.0.io.rx::<LoginStartS>().await?;
+        let login: LoginStartS = login.decode()?;
 
         // need to manually clone this or else the reference to self.io lives too long
         // TODO: clean up lifetimes on encode/decode - possibly just clone strings?
@@ -246,19 +246,19 @@ impl SharedPlayer {
             *own_uuid = Some(uuid);
         }
 
-        io.tx(&success).await?;
-        io.rx::<LoginAckS>().await?;
+        self.0.io.tx(&success).await?;
+        self.0.io.rx::<LoginAckS>().await?;
 
         let clientbound_known_packs = KnownPacksC::of_version(&state.version_name);
-        io.tx(&clientbound_known_packs).await?;
+        self.0.io.tx(&clientbound_known_packs).await?;
 
         // TODO: maybe(?) actually handle this
-        io.rx::<KnownPacksS>().await?;
+        self.0.io.rx::<KnownPacksS>().await?;
 
-        io.tx_raw(&state.registry_cache.encoded).await?;
+        self.0.io.tx_raw(&state.registry_cache.encoded).await?;
 
-        io.tx(&FinishConfigurationC).await?;
-        io.rx::<FinishConfigurationAckS>().await?;
+        self.0.io.tx(&FinishConfigurationC).await?;
+        self.0.io.rx::<FinishConfigurationAckS>().await?;
 
         Ok(())
     }
@@ -282,7 +282,6 @@ impl SharedPlayer {
         *packet_state = PacketState::Play;
 
         let state = self.0.crawlstate.clone();
-        let mut io = self.0.io.lock().await;
 
         let max_players: i32 = state.max_players.try_into().unwrap_or(50);
 
@@ -308,64 +307,72 @@ impl SharedPlayer {
             enforces_secure_chat: false,
         };
 
-        io.tx(&login).await?;
+        self.0.io.tx(&login).await?;
 
-        io.tx(&SetTickingStateC {
-            tick_rate: 20.0,
-            is_frozen: false,
-        })
-        .await?;
+        self.0
+            .io
+            .tx(&SetTickingStateC {
+                tick_rate: 20.0,
+                is_frozen: false,
+            })
+            .await?;
 
-        io.tx(&StepTicksC(10)).await?;
-
-        drop(io);
+        self.0.io.tx(&StepTicksC(10)).await?;
 
         let spawnpoint = state.spawnpoint;
         self.teleport_awaiting(spawnpoint.0, spawnpoint.1, spawnpoint.2, 0.0, 0.0)
             .await?;
 
-        let mut io = self.0.io.lock().await;
-
-        io.tx(&SetBorderCenterC {
-            x: spawnpoint.0,
-            z: spawnpoint.2,
-        })
-        .await?;
-
-        io.tx(&SetBorderSizeC(state.border_radius as f64 * 2.0))
+        self.0
+            .io
+            .tx(&SetBorderCenterC {
+                x: spawnpoint.0,
+                z: spawnpoint.2,
+            })
             .await?;
 
-        io.tx(&PlayerInfoUpdateC {
-            players: &[PlayerStatus::for_player(self.uuid().await)
-                .add_player("You're alone...", &[])
-                .update_listed(true)],
-        })
-        .await?;
+        self.0
+            .io
+            .tx(&SetBorderSizeC(state.border_radius as f64 * 2.0))
+            .await?;
+
+        self.0
+            .io
+            .tx(&PlayerInfoUpdateC {
+                players: &[PlayerStatus::for_player(self.uuid().await)
+                    .add_player("You're alone...", &[])
+                    .update_listed(true)],
+            })
+            .await?;
 
         let await_chunks = GameEventC::from(GameEvent::StartWaitingForLevelChunks);
-        io.tx(&await_chunks).await?;
+        self.0.io.tx(&await_chunks).await?;
 
         let set_center = SetCenterChunkC {
             x: VarInt(spawnpoint.0.floor() as i32 / 16),
             y: VarInt(spawnpoint.2.floor() as i32 / 16),
         };
-        io.tx(&set_center).await?;
-        drop(io);
+        self.0.io.tx(&set_center).await?;
 
         // FIXME: GROSS LOL?????? this should(?) change ownership of the player to the server
         // thread but realistically who knows burhhhh
         state.player_send.send(self.clone()).await?;
+        self.spawn_read_loop();
 
         Ok(())
     }
 
     pub async fn handle_all_packets(&self) -> Result<()> {
-        let Some(packets) = self.rx_all().await else {
-            bail!("Connection for player {} was closed", self.id())
+        let packets = {
+            let mut frame_queue = self.0.frame_queue.lock().await;
+            std::mem::take(&mut *frame_queue)
         };
 
-        debug!("player {} {:?}", self.id(), packets);
-        self.handle_frames(packets).await
+        for packet in packets {
+            self.handle_frame(packet).await?;
+        }
+
+        Ok(())
     }
 
     pub async fn keepalive(&self) -> Result<()> {
@@ -392,28 +399,9 @@ impl SharedPlayer {
         }
     }
 
-    async fn rx_all(&self) -> Option<Vec<Frame>> {
-        let mut io = self.0.io.lock().await;
-
-        let mut frames = Vec::new();
-
-        loop {
-            match io.rx_raw().await {
-                Ok(frame) => frames.push(frame),
-                Err(why) => match why.downcast_ref::<tokio::io::Error>().map(|e| e.kind()) {
-                    Some(tokio::io::ErrorKind::UnexpectedEof) => return None,
-                    _ => break,
-                },
-            }
-        }
-
-        Some(frames)
-    }
-
     async fn ping(&self, id: i64) -> Result<()> {
-        let mut io = self.0.io.lock().await;
         let ka = KeepAliveC(id);
-        io.tx(&ka).await?;
+        self.0.io.tx(&ka).await?;
         // TODO: check return keepalive, kick
         Ok(())
     }
@@ -438,17 +426,16 @@ impl SharedPlayer {
             };
         }
 
-        let mut io = self.0.io.lock().await;
-
         let tp = SynchronisePositionC::new(x, y, z, yaw, pitch);
         {
             let mut tp_state = self.0.tp_state.write().await;
             // player will be given 5 (FIVE) SECONDS TO ACK!!!!!
             *tp_state = TeleportState::Pending(tp.id, Instant::now());
         }
-        io.tx(&tp).await?;
+        self.0.io.tx(&tp).await?;
 
-        let tp_ack = io.rx::<ConfirmTeleportS>().await?;
+        let tp_ack = self.0.io.rx::<ConfirmTeleportS>().await?;
+        let tp_ack = tp_ack.decode::<ConfirmTeleportS>()?;
 
         match tokio::time::timeout(Duration::from_secs(5), self.confirm_teleport(tp_ack.id)).await {
             Ok(Ok(())) => {
@@ -506,52 +493,69 @@ impl SharedPlayer {
         }
     }
 
-    async fn handle_frames(&self, frames: Vec<Frame>) -> Result<()> {
-        for frame in frames {
-            match frame.id {
-                SetPlayerPositionS::ID => {
-                    let packet: SetPlayerPositionS = frame.decode()?;
+    fn spawn_read_loop(&self) {
+        let player = self.clone();
 
-                    let tp_state = self.0.tp_state.read().await;
-                    match *tp_state {
-                        TeleportState::Clear => {
-                            let mut entity = self.0.entity.write().await;
-                            entity.reposition(packet.x, packet.feet_y, packet.z);
-                        }
-                        _ => (),
+        tokio::spawn(async move {
+            loop {
+                match player.0.io.rx_raw().await {
+                    Ok(frame) => {
+                        let mut queue = player.0.frame_queue.lock().await;
+                        queue.push(frame);
                     }
-                }
-
-                SetPlayerPositionAndRotationS::ID => {
-                    let packet: SetPlayerPositionAndRotationS = frame.decode()?;
-
-                    let tp_state = self.0.tp_state.read().await;
-                    match *tp_state {
-                        TeleportState::Clear => {
-                            let mut entity = self.0.entity.write().await;
-                            entity.reposition(packet.x, packet.feet_y, packet.z);
-                            entity.rotate(packet.yaw, packet.pitch);
-                        }
+                    Err(why) => match why.downcast_ref::<tokio::io::Error>().map(|e| e.kind()) {
+                        Some(tokio::io::ErrorKind::UnexpectedEof) => return,
                         _ => (),
+                    },
+                }
+            }
+        });
+    }
+
+    async fn handle_frame(&self, frame: Frame) -> Result<()> {
+        match frame.id {
+            SetPlayerPositionS::ID => {
+                let packet: SetPlayerPositionS = frame.decode()?;
+
+                let tp_state = self.0.tp_state.read().await;
+                match *tp_state {
+                    TeleportState::Clear => {
+                        let mut entity = self.0.entity.write().await;
+                        entity.reposition(packet.x, packet.feet_y, packet.z);
                     }
+                    _ => (),
                 }
+            }
 
-                ConfirmTeleportS::ID => {
-                    let packet: ConfirmTeleportS = frame.decode()?;
-                    self.check_teleports(Some(packet)).await?;
-                }
+            SetPlayerPositionAndRotationS::ID => {
+                let packet: SetPlayerPositionAndRotationS = frame.decode()?;
 
-                UseItemOnS::ID => {
-                    let packet: UseItemOnS = frame.decode()?;
-                    self.handle_use_item(packet).await?;
+                let tp_state = self.0.tp_state.read().await;
+                match *tp_state {
+                    TeleportState::Clear => {
+                        let mut entity = self.0.entity.write().await;
+                        entity.reposition(packet.x, packet.feet_y, packet.z);
+                        entity.rotate(packet.yaw, packet.pitch);
+                    }
+                    _ => (),
                 }
+            }
 
-                id => {
-                    debug!(
-                        "Got packet with id {id} from player {}, ignoring",
-                        self.0.id
-                    );
-                }
+            ConfirmTeleportS::ID => {
+                let packet: ConfirmTeleportS = frame.decode()?;
+                self.check_teleports(Some(packet)).await?;
+            }
+
+            UseItemOnS::ID => {
+                let packet: UseItemOnS = frame.decode()?;
+                self.handle_use_item(packet).await?;
+            }
+
+            id => {
+                debug!(
+                    "Got packet with id {id} from player {}, ignoring",
+                    self.0.id
+                );
             }
         }
 
@@ -567,10 +571,7 @@ impl SharedPlayer {
             title: "Hi".into(),
         };
 
-        {
-            let mut io = self.0.io.lock().await;
-            io.tx(&OpenScreenC::from(&window)).await?;
-        }
+        self.0.io.tx(&OpenScreenC::from(&window)).await?;
 
         {
             let mut sw = self.0.window.write().await;
