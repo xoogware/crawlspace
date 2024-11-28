@@ -17,7 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::cmp::Ordering;
+use std::{cmp::Ordering, sync::Arc};
 
 use rayon::prelude::*;
 
@@ -31,6 +31,7 @@ use crate::{
         Encoder,
     },
     world::{blocks::Blocks, World},
+    CrawlState,
 };
 
 #[derive(Debug)]
@@ -38,8 +39,8 @@ pub struct WorldCache {
     pub encoded: Vec<Vec<u8>>,
 }
 
-impl From<World> for WorldCache {
-    fn from(world: World) -> Self {
+impl WorldCache {
+    pub fn from_anvil(crawlstate: CrawlState, world: World) -> Self {
         let mut chunks = world.0.iter().collect::<Vec<_>>();
 
         chunks.sort_by(|((ax, az), _), ((bx, bz), _)| {
@@ -54,7 +55,7 @@ impl From<World> for WorldCache {
 
         let chunks = chunks
             .par_iter()
-            .map(|(_, c)| ChunkDataUpdateLightC::new(c, &block_states))
+            .map(|(_, c)| ChunkDataUpdateLightC::new(crawlstate.clone(), c, &block_states))
             .collect::<Vec<ChunkDataUpdateLightC<'_>>>();
 
         let encoded = chunks
@@ -76,6 +77,7 @@ impl From<World> for WorldCache {
 pub struct RegistryCache {
     pub encoded: Vec<u8>,
     pub the_end_id: VarInt,
+    pub the_end_biome_id: u16,
 }
 
 impl From<&AllRegistries> for RegistryCache {
@@ -83,6 +85,7 @@ impl From<&AllRegistries> for RegistryCache {
         let mut encoder = Encoder::new();
 
         let dimensions = Registry::from(registry.dimension_type.clone());
+        let biomes = Registry::from(registry.biome.clone());
         encoder
             .append_packet(&Registry::from(registry.trim_material.clone()))
             .expect("Failed to encode trim material");
@@ -93,9 +96,6 @@ impl From<&AllRegistries> for RegistryCache {
             .append_packet(&Registry::from(registry.banner_pattern.clone()))
             .expect("Failed to encode banner pattern");
         encoder
-            .append_packet(&Registry::from(registry.biome.clone()))
-            .expect("Failed to encode biome");
-        encoder
             .append_packet(&Registry::from(registry.chat_type.clone()))
             .expect("Failed to encode chat type");
         encoder
@@ -104,6 +104,9 @@ impl From<&AllRegistries> for RegistryCache {
         encoder
             .append_packet(&dimensions)
             .expect("Failed to encode dimensions");
+        encoder
+            .append_packet(&biomes)
+            .expect("Failed to encode biomes");
         encoder
             .append_packet(&Registry::from(registry.wolf_variant.clone()))
             .expect("Failed to encode wolf variants");
@@ -114,6 +117,7 @@ impl From<&AllRegistries> for RegistryCache {
         Self {
             encoded: encoder.take().to_vec(),
             the_end_id: VarInt(dimensions.index_of("minecraft:the_end")),
+            the_end_biome_id: biomes.index_of("minecraft:the_end") as u16,
         }
     }
 }

@@ -17,7 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use bit_vec::BitVec;
 use bytes::BufMut;
@@ -32,6 +32,7 @@ use crate::{
         self,
         blocks::{BlockState, Blocks},
     },
+    CrawlState,
 };
 
 #[derive(Debug)]
@@ -258,7 +259,11 @@ impl Encode for ChunkDataUpdateLightC<'_> {
 }
 
 impl ChunkSection {
-    pub fn anvil_to_sec(value: &world::Section, block_states: &Blocks) -> Self {
+    pub fn anvil_to_sec(
+        crawlstate: CrawlState,
+        value: &world::Section,
+        block_states: &Blocks,
+    ) -> Self {
         let mut blocks = Vec::new();
         let bit_length = (64 - (value.block_states.palette.len() as u64).leading_zeros()).max(4);
 
@@ -379,7 +384,9 @@ impl ChunkSection {
             },
             biomes: PalettedContainer {
                 bits_per_entry: 0,
-                palette: Palette::SingleValued(BlockState(0)),
+                palette: Palette::SingleValued(BlockState(
+                    crawlstate.registry_cache.the_end_biome_id,
+                )),
                 data_array: fastnbt::LongArray::new(vec![]),
             },
         }
@@ -387,11 +394,11 @@ impl ChunkSection {
 }
 
 impl ChunkDataUpdateLightC<'_> {
-    pub fn new(value: &world::Chunk, block_states: &Blocks) -> Self {
+    pub fn new(crawlstate: CrawlState, value: &world::Chunk, block_states: &Blocks) -> Self {
         let data = value
             .sections
             .iter()
-            .map(|sec| ChunkSection::anvil_to_sec(sec, block_states))
+            .map(|sec| ChunkSection::anvil_to_sec(crawlstate.clone(), sec, block_states))
             .collect::<Vec<_>>();
 
         let block_entities = value

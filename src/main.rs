@@ -74,11 +74,11 @@ async fn main() -> Result<()> {
     let world = read_world(&args.map_dir)?;
     info!("Done.");
 
-    info!("Generating world chunk packets");
-    let world_cache = WorldCache::from(world);
-    info!("Done.");
-
     let state = Arc::new(state::State::new(VERSION, VERSION_NUM, args));
+
+    info!("Generating world chunk packets");
+    let world_cache = WorldCache::from_anvil(state.clone(), world);
+    info!("Done.");
 
     #[cfg(feature = "lan")]
     net::spawn_lan_broadcast(state.clone()).await?;
