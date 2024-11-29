@@ -91,7 +91,7 @@ impl WorldCache {
                     .map(|container| {
                         (
                             (container.x, container.y, container.z),
-                            Container(Vec::new()),
+                            Container::try_from(container).expect("Failed to convert container from block entity NBT"),
                         )
                     })
                     .collect::<Vec<((i32, i32, i32), Container)>>()
@@ -99,7 +99,7 @@ impl WorldCache {
             .flatten()
             .collect();
 
-        info!("Containers: {:?}", containers);
+        debug!("Containers: {:?}", containers);
 
         let encoded = chunks
             .par_iter()

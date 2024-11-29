@@ -19,7 +19,7 @@
 
 use crate::{
     protocol::{
-        datatypes::{TextComponent, VarInt},
+        datatypes::{Slot, TextComponent, VarInt},
         Encode, Packet,
     },
     server::window::{Window, WindowType},
@@ -54,5 +54,33 @@ impl From<&Window> for OpenScreenC {
             window_type: value.kind,
             window_title: value.title.clone(),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct SetContainerContentC {
+    pub window_id: u8,
+    pub state_id: i32,
+    pub slot_data: Vec<Slot>,
+    pub carried_item: Slot,
+}
+
+impl Packet for SetContainerContentC {
+    const ID: i32 = 0x13;
+}
+
+impl Encode for SetContainerContentC {
+    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
+        self.window_id.encode(&mut w)?;
+        VarInt(self.state_id).encode(&mut w)?;
+        VarInt(self.slot_data.len() as i32).encode(&mut w)?;
+
+        for slot in &self.slot_data {
+            slot.encode(&mut w)?;
+        }
+
+        self.carried_item.encode(&mut w)?;
+
+        Ok(())
     }
 }

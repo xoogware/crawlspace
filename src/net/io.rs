@@ -130,6 +130,7 @@ impl NetIo {
         encoder.append_packet(packet)?;
         let bytes = encoder.take();
         trace!("raw packet is {} bytes", bytes.len());
+        trace!("{:?}", bytes.to_vec());
         let mut writer = self.write_half.lock().await;
         Ok(writer.write_all(&bytes).await?)
     }

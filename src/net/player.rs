@@ -38,14 +38,14 @@ use uuid::Uuid;
 
 use crate::{
     protocol::{
-        datatypes::{Bounded, VarInt},
+        datatypes::{Bounded, Slot, VarInt},
         packets::{
             login::*,
             play::{
                 ConfirmTeleportS, GameEvent, GameEventC, Gamemode, KeepAliveC, LoginPlayC,
                 OpenScreenC, PlayerInfoUpdateC, PlayerStatus, SetBorderCenterC, SetBorderSizeC,
-                SetCenterChunkC, SetPlayerPositionAndRotationS, SetPlayerPositionS,
-                SetTickingStateC, StepTicksC, SynchronisePositionC, UseItemOnS,
+                SetCenterChunkC, SetContainerContentC, SetPlayerPositionAndRotationS,
+                SetPlayerPositionS, SetTickingStateC, StepTicksC, SynchronisePositionC, UseItemOnS,
             },
         },
         Frame, Packet, PacketState,
@@ -76,7 +76,7 @@ pub struct Player {
 
     entity: RwLock<Entity>,
 
-    next_window_id: AtomicU8,
+    next_window_id: Mutex<u8>,
     window: RwLock<Option<Window>>,
 }
 
@@ -113,7 +113,7 @@ impl SharedPlayer {
 
             entity: RwLock::new(Entity::default()),
 
-            next_window_id: AtomicU8::new(0),
+            next_window_id: Mutex::new(1),
             window: RwLock::new(None),
         }))
     }
@@ -570,7 +570,15 @@ impl SharedPlayer {
         match server.get_container(x, y, z) {
             None => (),
             Some(container) => {
-                let id = self.0.next_window_id.fetch_add(1, Ordering::Relaxed);
+                let id = {
+                    let mut next_window_id = self.0.next_window_id.lock().await;
+                    let id = *next_window_id;
+                    *next_window_id = next_window_id.wrapping_add(1);
+                    if *next_window_id == 0 {
+                        *next_window_id = 1;
+                    }
+                    id
+                };
 
                 let window = Window {
                     id,
@@ -579,6 +587,17 @@ impl SharedPlayer {
                 };
 
                 self.0.io.tx(&OpenScreenC::from(&window)).await?;
+
+                self.0
+                    .io
+                    .tx(&SetContainerContentC {
+                        window_id: id,
+                        // FIXME: track this correctly
+                        state_id: 0,
+                        slot_data: container.0,
+                        carried_item: Slot::default(),
+                    })
+                    .await?;
 
                 {
                     let mut sw = self.0.window.write().await;

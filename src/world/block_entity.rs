@@ -19,6 +19,7 @@
 
 use color_eyre::eyre::{bail, Result};
 use fastnbt::Value;
+use serde::Deserialize;
 
 macro_rules! get_tag {
     ($data:expr, $tag_kind:path, $tag_name:literal) => {{
@@ -73,4 +74,32 @@ impl BlockEntity {
             raw_data,
         })
     }
+
+    pub fn try_get_items(&self) -> Result<Vec<Item>> {
+        match self.id.as_str() {
+            "minecraft:chest" | "minecraft:trapped_chest" | "minecraft:barrel" => {
+                let Value::Compound(ref data) = self.raw_data else {
+                    bail!(
+                        "try_get_items was called with raw_data that is not a compound: {:?}",
+                        self.raw_data
+                    );
+                };
+
+                let items = get_tag!(data, Value::List, "Items");
+                Ok(items
+                    .iter()
+                    .map(|i| fastnbt::from_value::<Item>(i).expect("Failed to parse item"))
+                    .collect())
+            }
+            id => bail!("try_get_items called on not a container ({id})"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Item {
+    #[serde(rename = "Slot")]
+    pub slot: i8,
+    pub id: String,
+    pub count: i32,
 }

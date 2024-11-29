@@ -19,5 +19,39 @@
 
 use crate::protocol::datatypes::Slot;
 
+use super::BlockEntity;
+
 #[derive(Debug, Clone)]
 pub struct Container(pub Vec<Slot>);
+
+#[derive(Debug, thiserror::Error)]
+pub enum ContainerCreationError {
+    #[error("Block entity is not a container")]
+    NotAContainer,
+    #[error("Parse error: {0}")]
+    ParseError(color_eyre::eyre::Report),
+}
+
+impl TryFrom<BlockEntity> for Container {
+    type Error = ContainerCreationError;
+
+    fn try_from(value: BlockEntity) -> Result<Self, Self::Error> {
+        match value.id.as_str() {
+            "minecraft:chest" | "minecraft:trapped_chest" | "minecraft:barrel" => {
+                let items = value
+                    .try_get_items()
+                    .map_err(|e| ContainerCreationError::ParseError(e))?;
+
+                let mut slots = vec![Slot::default(); 27];
+
+                for item in items {
+                    let slot_index = item.slot as usize;
+                    slots[slot_index] = Slot::from(item);
+                }
+
+                Ok(Self(slots))
+            }
+            _ => Err(ContainerCreationError::NotAContainer),
+        }
+    }
+}

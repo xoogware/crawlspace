@@ -17,6 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+pub mod registries;
 pub mod ticker;
 pub mod window;
 
