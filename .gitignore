@@ -3,3 +3,5 @@
 result
 log
 tmp/
+.direnv/
+.envrc

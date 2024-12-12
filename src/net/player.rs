@@ -42,10 +42,11 @@ use crate::{
         packets::{
             login::*,
             play::{
-                ConfirmTeleportS, GameEvent, GameEventC, Gamemode, KeepAliveC, LoginPlayC,
-                OpenScreenC, PlayerInfoUpdateC, PlayerStatus, SetBorderCenterC, SetBorderSizeC,
-                SetCenterChunkC, SetContainerContentC, SetPlayerPositionAndRotationS,
-                SetPlayerPositionS, SetTickingStateC, StepTicksC, SynchronisePositionC, UseItemOnS,
+                ClickContainerS, ConfirmTeleportS, GameEvent, GameEventC, Gamemode, KeepAliveC,
+                LoginPlayC, OpenScreenC, PlayerInfoUpdateC, PlayerStatus, SetBorderCenterC,
+                SetBorderSizeC, SetCenterChunkC, SetContainerContentC,
+                SetPlayerPositionAndRotationS, SetPlayerPositionS, SetTickingStateC, StepTicksC,
+                SynchronisePositionC, UseItemOnS,
             },
         },
         Frame, Packet, PacketState,
@@ -546,6 +547,11 @@ impl SharedPlayer {
                 self.handle_use_item(packet).await?;
             }
 
+            ClickContainerS::ID => {
+                let packet: ClickContainerS = frame.decode()?;
+                self.handle_click_container(packet).await?;
+            }
+
             id => {
                 debug!(
                     "Got packet with id {id} from player {}, ignoring",
@@ -606,6 +612,10 @@ impl SharedPlayer {
             }
         }
 
+        Ok(())
+    }
+
+    async fn handle_click_container(&self, packet: ClickContainerS) -> Result<()> {
         Ok(())
     }
 }

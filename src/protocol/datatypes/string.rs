@@ -17,6 +17,8 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use std::io::Read;
+
 use color_eyre::eyre::{ensure, Result};
 
 use crate::protocol::{Decode, Encode};
@@ -68,6 +70,18 @@ impl Encode for str {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         VarInt(self.len() as i32).encode(&mut w)?;
         Ok(w.write_all(self.as_bytes())?)
+    }
+}
+
+impl Decode<'_> for String {
+    fn decode(r: &mut &'_ [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let len = VarInt::decode(r)?.0 as usize;
+        let mut buf = vec![0; len];
+        r.read_exact(&mut buf);
+        Ok(String::from_utf8(buf.to_vec())?)
     }
 }
 

@@ -17,9 +17,12 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use std::collections::HashMap;
+
 use color_eyre::eyre::{bail, Result};
 use fastnbt::Value;
 use serde::Deserialize;
+use serde_with::{serde_as, EnumMap};
 
 macro_rules! get_tag {
     ($data:expr, $tag_kind:path, $tag_name:literal) => {{
@@ -96,10 +99,61 @@ impl BlockEntity {
     }
 }
 
+#[serde_as]
 #[derive(Debug, Clone, Deserialize)]
 pub struct Item {
     #[serde(rename = "Slot")]
     pub slot: i8,
     pub id: String,
     pub count: i32,
+    #[serde_as(as = "EnumMap")]
+    pub components: Vec<Component>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub enum Component {
+    #[serde(rename = "minecraft:written_book_content")]
+    WrittenBookContent {
+        pages: Vec<Page>,
+        title: Text,
+        author: String,
+        #[serde(default)]
+        generation: Generation,
+        #[serde(default)]
+        resolved: bool,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum Page {
+    Text(Text),
+    String(String),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Text {
+    pub raw: String,
+    pub filtered: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[repr(i32)]
+pub enum Generation {
+    Original,
+    CopyOfOriginal,
+    CopyOfCopy,
+    Tattered,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum GenerationDecodeError {
+    #[error("Invalid tag: {0}")]
+    Invalid(i32),
+}
+
+impl Default for Generation {
+    fn default() -> Self {
+        Self::Original
+    }
 }

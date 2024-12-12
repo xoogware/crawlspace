@@ -17,22 +17,47 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use serde::Serialize;
+use fastnbt::{DeOpts, SerOpts};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize)]
-pub struct TextComponent {
-    text: String,
+use crate::protocol::{Decode, Encode};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TextComponent {
+    String { text: String },
+    Compound,
 }
 
 impl From<String> for TextComponent {
     fn from(value: String) -> Self {
-        Self { text: value }
+        Self::String { text: value }
     }
 }
 impl From<&str> for TextComponent {
     fn from(value: &str) -> Self {
-        Self {
+        Self::String {
             text: value.to_owned(),
+        }
+    }
+}
+
+impl Encode for TextComponent {
+    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
+        fastnbt::to_bytes_with_opts(self, SerOpts::network_nbt())?.encode(&mut w)?;
+
+        Ok(())
+    }
+}
+
+impl Decode<'_> for TextComponent {
+    fn decode(r: &mut &'_ [u8]) -> color_eyre::eyre::Result<Self>
+    where
+        Self: Sized,
+    {
+        match fastnbt::from_bytes_with_opts::<String>(r, DeOpts::network_nbt()) {
+            Ok(s) => Ok(TextComponent::from(s)),
+            Err(_) => Ok(fastnbt::from_bytes_with_opts(r, DeOpts::network_nbt())?),
         }
     }
 }

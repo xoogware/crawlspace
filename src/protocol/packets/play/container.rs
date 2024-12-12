@@ -17,10 +17,13 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use byteorder::{BigEndian, ReadBytesExt};
+use bytes::Buf;
+
 use crate::{
     protocol::{
         datatypes::{Slot, TextComponent, VarInt},
-        Encode, Packet,
+        Decode, Encode, Packet,
     },
     server::window::{Window, WindowType},
 };
@@ -82,5 +85,80 @@ impl Encode for SetContainerContentC {
         self.carried_item.encode(&mut w)?;
 
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct ClickContainerS {
+    pub window_id: u8,
+    pub state_id: i32,
+    pub slot: i16,
+    pub button: i8,
+    pub mode: InventoryMode,
+    pub changed_slots: Vec<(i16, Slot)>,
+    pub carried_item: Slot,
+}
+
+#[derive(Debug)]
+#[repr(i32)]
+pub enum InventoryMode {
+    Mode0,
+    Mode1,
+    Mode2,
+    Mode3,
+    Mode4,
+    Mode5,
+    Mode6,
+    Invalid,
+}
+
+impl From<i32> for InventoryMode {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => Self::Mode0,
+            1 => Self::Mode1,
+            2 => Self::Mode2,
+            3 => Self::Mode3,
+            4 => Self::Mode4,
+            5 => Self::Mode5,
+            6 => Self::Mode6,
+            _ => Self::Invalid,
+        }
+    }
+}
+
+impl Packet for ClickContainerS {
+    const ID: i32 = 0x0E;
+}
+
+impl Decode<'_> for ClickContainerS {
+    fn decode(r: &mut &'_ [u8]) -> color_eyre::eyre::Result<Self>
+    where
+        Self: Sized,
+    {
+        let window_id = r.read_u8()?;
+        let state_id = VarInt::decode(r)?.0;
+        let slot = r.read_i16::<BigEndian>()?;
+        let button = r.read_i8()?;
+        let mode = r.read_i32::<BigEndian>()?.into();
+
+        let changed_slot_len = VarInt::decode(r)?.0;
+
+        let mut changed_slots = Vec::new();
+        for _ in 0..changed_slot_len {
+            changed_slots.push((r.read_i16::<BigEndian>()?, Slot::decode(r)?));
+        }
+
+        let carried_item = Slot::decode(r)?;
+
+        Ok(Self {
+            window_id,
+            state_id,
+            slot,
+            button,
+            mode,
+            changed_slots,
+            carried_item,
+        })
     }
 }
