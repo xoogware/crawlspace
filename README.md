@@ -48,7 +48,7 @@ podman pull ghcr.io/xoogware/crawlspace:latest
 ```
 then run with the world mounted read-only:
 ```bash
-podman run --rm -v=./tmp/DIM1:/world:ro crawlspace -- /world
+podman run --rm --read-only -v=./tmp/DIM1:/world:ro,Z -e="LIMBO_WORLD=/world" -p=8006:25565 crawlspace
 ```
 
 # Configuration

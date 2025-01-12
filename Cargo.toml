@@ -28,7 +28,7 @@ bitfield-struct = "0.9.2"
 byteorder = "1.5.0"
 bytes = "1.8.0"
 cfb8 = { version = "0.8.1", optional = true }
-clap = { version = "4.5.20", features = ["derive"] }
+clap = { version = "4.5.20", features = ["derive", "env"] }
 color-eyre = "0.6.3"
 fastanvil = { git = "https://github.com/owengage/fastnbt.git" }
 fastnbt = { git = "https://github.com/owengage/fastnbt.git" }
@@ -53,3 +53,11 @@ lan = []
 timings = []
 
 full = ["compression", "encryption"]
+
+[profile.release-stripped]
+inherits = "release"
+strip = "symbols"
+
+[profile.release-lto]
+inherits = "release-stripped"
+lto = true

@@ -1,0 +1,73 @@
+name: build
+on:
+  schedule:
+    - cron: "00 00 * * *"
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: crawlspace
+  IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+
+jobs:
+  check-last-commit:
+    runs-on: ubuntu-24.04
+    name: Check last commit date
+    outputs:
+      run-approved: ${{ steps.confirm-run.outputs.run-approved }}
+    steps:
+      - uses: actions/checkout@v2
+      - id: confirm-run
+        continue-on-error: true
+        name: Check last commit is <24h old
+        if: ${{ github.event_name == 'schedule' }}
+        run: test -z $(git ref-list --after="24 hours" ${{ github.sha }}) && echo "::set-output name=run-approved::false"
+
+  build-container:
+    name: Build and push container
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    needs: check-last-commit
+    if: ${{ needs.check-last-commit.outputs.run-approved != 'false' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate tag
+        id: generate-tags
+        run: |
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "date=$(date +%m%d%Y)" >> $GITHUB_OUTPUT
+
+      - name: Image Metadata
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ${{ env.IMAGE_NAME }}
+          labels: |
+            io.artifacthub.package.readme-url=https://raw.githubusercontent.com/xoogware/crawlspace/main/README.md
+
+      - name: Build image
+        id: build
+        uses: redhat-actions/buildah-build@v2
+        with:
+          containerfiles: |
+            ./Containerfile
+          image: ${{ env.IMAGE_NAME }}
+          labels: ${{ steps.meta.outputs.labels }}
+          oci: false
+          tags: |
+            ${{ steps.generate-tags.outputs.sha }}
+            ${{ steps.generate-tags.outputs.date }}
+            nightly
+
+      - name: Push
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ steps.build.outputs.image }}
+          tags: ${{ steps.build.outputs.tags }}
+          registry: ${{ env.IMAGE_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+

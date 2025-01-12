@@ -1,0 +1,14 @@
+/target
+# nix build result
+result
+log
+tmp/
+.git
+.github
+.gitignore
+Containerfile
+.containerignore
+DEFAULT_LICENSE
+flake.lock
+flake.nix
+README.md
