@@ -42,9 +42,9 @@ cargo build --profile=release-lto
 
 ## Use a container image
 Nightly builds of Crawlspace are pushed to GHCR, and tagged version releases will be as well.
-Pull using either `latest` or a commit short hash as the tag:
+Pull using either `nightly` or a commit short hash as the tag:
 ```bash
-podman pull ghcr.io/xoogware/crawlspace:latest
+podman pull ghcr.io/xoogware/crawlspace:nightly
 ```
 then run with the world mounted read-only:
 ```bash
