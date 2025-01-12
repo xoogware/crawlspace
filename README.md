@@ -15,8 +15,8 @@ it's possible that it'll work on older minecraft versions but honestly I am not 
 > This means that Crawlspace can currently **only load worlds that have been specially prepared for it**: currently, only the End is supported, and chunks are loaded **immediately** and sent to the player, so world size should be kept as small as possible (between chunks -10 and 10 on both axes, inclusive).
 
 # Running
-Download a precompiled binary, if available, or [build from source](##build-from-source).
-You can also [use a container image](##use-a-container-image).
+Download a precompiled binary, if available, or [build from source](#build-from-source).
+You can also [use a container image](#use-a-container-image).
 
 ## Build from source
 Clone the repo:
@@ -55,7 +55,7 @@ podman run --rm -v=./tmp/DIM1:/world:ro crawlspace -- /world
 Crawlspace supports multiple modes of configuration. In order of priority, with first being the highest:
 
 1. Command line flags (run `crawlspace --help` for more info)
-2. Environment variables (see [Environment Variables](##environment-variables))
+2. Environment variables (see [Environment Variables](#environment-variables))
 3. (TO BE IMPLEMENTED) Lua Scripting API (see [Lua Scripting](#lua-scripting))
 
 ## Environment Variables
