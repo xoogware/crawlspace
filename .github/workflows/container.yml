@@ -45,8 +45,6 @@ jobs:
         with:
           images: |
             ${{ env.IMAGE_NAME }}
-          labels: |
-            io.artifacthub.package.readme-url=https://raw.githubusercontent.com/xoogware/crawlspace/main/README.md
 
       - name: Build image
         id: build
