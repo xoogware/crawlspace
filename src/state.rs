@@ -38,6 +38,7 @@ pub struct State {
     pub version_number: i32,
     pub addr: String,
     pub port: u16,
+    pub velocity_forwarding: bool,
 
     pub registry_cache: RegistryCache,
 
@@ -74,6 +75,7 @@ impl State {
             version_number: version_number.to_owned(),
             addr: args.addr,
             port: args.port,
+            velocity_forwarding: args.velocity_forwarding,
 
             registry_cache: RegistryCache::from(&*ALL_REGISTRIES),
 

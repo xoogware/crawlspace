@@ -38,7 +38,7 @@ use uuid::Uuid;
 
 use crate::{
     protocol::{
-        datatypes::{Bounded, Slot, VarInt},
+        datatypes::{Bounded, Bytes, Rest, Slot, VarInt},
         packets::{
             login::*,
             play::{
@@ -230,8 +230,16 @@ impl SharedPlayer {
         let uuid = login.player_uuid;
         let username = login.name.0.to_owned();
 
-        #[cfg(feature = "encryption")]
-        self.login_velocity(&username).await?;
+        if state.velocity_forwarding {
+            let understood = self.login_velocity().await?;
+
+            if !understood {
+                warn!(
+                    "Velocity forwarding is on, but client {} did not properly respond to our forwarding request. This will kick in future.",
+                    self.0.id
+                )
+            }
+        }
 
         let success = LoginSuccessC {
             uuid,
@@ -262,17 +270,20 @@ impl SharedPlayer {
         Ok(())
     }
 
-    #[cfg(feature = "encryption")]
-    async fn login_velocity(&self, _username: &str) -> Result<()> {
+    async fn login_velocity(&self) -> Result<bool> {
         let req = PluginRequestC {
             message_id: VarInt(0),
             channel: Bounded("velocity:player_info"),
-            data: Bounded(Bytes(&[3])),
+            data: Rest(Bytes(&[3])),
         };
 
         self.0.io.tx(&req).await?;
 
-        Ok(())
+        let res = self.0.io.rx::<PluginResponseS>().await?;
+        let res: PluginResponseS = res.decode()?;
+
+        // todo: replace with a profile maybe?
+        Ok(res.data.is_some() && req.message_id.0 == res.message_id.0)
     }
 
     async fn begin_play(&self) -> Result<()> {

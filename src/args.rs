@@ -30,6 +30,9 @@ pub struct Args {
     /// The port to serve crawlspace on. Defaults to 25565 if not set.
     #[arg(short, long, default_value = "25565", env = "LIMBO_PORT")]
     pub port: u16,
+    // Whether or not to enable Velocity forwarding.
+    #[arg(short, long, default_value = "true", env = "LIMBO_VELOCITY_FORWARDING")]
+    pub velocity_forwarding: bool,
     /// The x coordinate of the spawnpoint.
     #[arg(short = 'x', long, default_value = "0", env = "LIMBO_SPAWN_X")]
     pub spawn_x: f64,

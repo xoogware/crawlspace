@@ -21,7 +21,7 @@ use color_eyre::eyre::Result;
 use uuid::Uuid;
 
 use crate::protocol::{
-    datatypes::{Bounded, Bytes, VarInt},
+    datatypes::{Bounded, Bytes, Rest, VarInt},
     Decode, Encode, Packet, Property,
 };
 
@@ -74,7 +74,7 @@ impl<'a> Encode for LoginSuccessC<'a> {
 pub struct PluginRequestC<'a> {
     pub message_id: VarInt,
     pub channel: Bounded<&'a str, 32767>,
-    pub data: Bounded<Bytes<'a>, 1048576>,
+    pub data: Rest<Bytes<'a>, 1048576>,
 }
 
 impl Packet for PluginRequestC<'_> {
@@ -88,6 +88,25 @@ impl<'a> Encode for PluginRequestC<'a> {
         self.data.encode(&mut w)?;
 
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct PluginResponseS<'a> {
+    pub message_id: VarInt,
+    pub data: Option<Rest<Bytes<'a>, 1048576>>
+}
+
+impl Packet for PluginResponseS<'_> {
+    const ID: i32 = 0x02;
+}
+
+impl<'a> Decode<'a> for PluginResponseS<'a> {
+    fn decode(r: &mut &'a [u8]) -> Result<Self> {
+        Ok(Self {
+            message_id: VarInt::decode(r)?,
+            data: if bool::decode(r)? { Some(Rest::<Bytes<'a>, 1048576>::decode(r)?) } else { None }
+        })
     }
 }
 

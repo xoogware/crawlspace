@@ -106,3 +106,60 @@ impl<'a, const BOUND: usize> Decode<'a> for Bounded<Bytes<'a>, BOUND> {
         Ok(Bounded(content))
     }
 }
+
+#[derive(Debug)]
+pub struct Rest<T, const BOUND: usize = 32767>(pub T);
+
+impl<'a, const BOUND: usize> Decode<'a> for Rest<&'a str, BOUND> {
+    fn decode(r: &mut &'a [u8]) -> Result<Self> {
+        let (content, rest) = r.split_at(r.len());
+        let content = std::str::from_utf8(content)?;
+        let utf16_len = content.encode_utf16().count();
+
+        ensure!(
+            utf16_len <= BOUND,
+            "utf-16 encoded string exceeds {BOUND} chars (is {utf16_len})"
+        );
+
+        *r = rest;
+
+        Ok(Rest(content))
+    }
+}
+
+impl<'a, const BOUND: usize> Encode for Rest<&'a str, BOUND> {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        let len = self.0.encode_utf16().count();
+
+        ensure!(len < BOUND, "length of string {len} exceeds bound {BOUND}");
+
+        Ok(w.write_all(self.0.as_bytes())?)
+    }
+}
+
+impl<'a, const BOUND: usize> Encode for Rest<Bytes<'a>, BOUND> {
+    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+        let len = self.0.0.len();
+
+        ensure!(len < BOUND, "length of bytes {len} exceeds bound {BOUND}");
+
+        self.0.encode(&mut w)
+    }
+}
+
+impl<'a, const BOUND: usize> Decode<'a> for Rest<Bytes<'a>, BOUND> {
+    fn decode(r: &mut &'a [u8]) -> Result<Self> {
+        let (mut content, rest) = r.split_at(r.len());
+        let content = Bytes::decode(&mut content)?;
+        let len = content.0.len();
+
+        ensure!(
+            len <= BOUND,
+            "raw byte length exceeds {BOUND} chars (is {len})"
+        );
+
+        *r = rest;
+
+        Ok(Rest(content))
+    }
+}
