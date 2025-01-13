@@ -311,7 +311,8 @@ impl ChunkSection {
 
         let blocks: Vec<u16> = blocks
             .iter()
-            .map(|b| palette.get(*b as usize).unwrap().0)
+            // todo: come up with a better way to do this(?)
+            .map(|b| palette.get(*b as usize).unwrap_or(&BlockState::AIR).0)
             .collect();
 
         let block_count = blocks.iter().filter(|b| **b != 0).collect::<Vec<_>>().len();
