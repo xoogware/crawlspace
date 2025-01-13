@@ -15,12 +15,13 @@ jobs:
     outputs:
       run-approved: ${{ steps.confirm-run.outputs.run-approved }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - id: confirm-run
         continue-on-error: true
         name: Check last commit is <24h old
         if: ${{ github.event_name == 'schedule' }}
-        run: test -z $(git ref-list --after="24 hours" ${{ github.sha }}) && echo "::set-output name=run-approved::false"
+        run: |
+          test -z $(git ref-list --after="24 hours" ${{ github.sha }}) && echo "run-approved=false" >> $GITHUB_OUTPUT
 
   build-container:
     name: Build and push container
