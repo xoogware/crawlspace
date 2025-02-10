@@ -19,17 +19,23 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::RegistryItem;
+use super::{RegistryItem, deserialize_bool};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DimensionType {
     fixed_time: Option<i64>,
+    #[serde(deserialize_with = "deserialize_bool")]
     has_skylight: i8,
+    #[serde(deserialize_with = "deserialize_bool")]
     has_ceiling: i8,
+    #[serde(deserialize_with = "deserialize_bool")]
     ultrawarm: i8,
+    #[serde(deserialize_with = "deserialize_bool")]
     natural: i8,
     coordinate_scale: f64,
+    #[serde(deserialize_with = "deserialize_bool")]
     bed_works: i8,
+    #[serde(deserialize_with = "deserialize_bool")]
     respawn_anchor_works: i8,
     min_y: i32,
     height: i32,
@@ -37,7 +43,9 @@ pub struct DimensionType {
     infiniburn: String,
     effects: String,
     ambient_light: f32,
+    #[serde(deserialize_with = "deserialize_bool")]
     piglin_safe: i8,
+    #[serde(deserialize_with = "deserialize_bool")]
     has_raids: i8,
     monster_spawn_light_level: IntOrLightLevel,
     monster_spawn_block_light_limit: i32,

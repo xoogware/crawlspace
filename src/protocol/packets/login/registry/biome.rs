@@ -44,7 +44,8 @@ struct Effects {
     ambient_sound: Option<StringOrCompound<AmbientSound>>,
     mood_sound: Option<MoodSound>,
     additions_sound: Option<AdditionsSound>,
-    music: Option<Music>,
+    music: Option<Vec<Music>>,
+    music_volume: Option<f32>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -81,6 +82,12 @@ struct AdditionsSound {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Music {
+    data: MusicData,
+    weight: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct MusicData {
     sound: String,
     min_delay: i32,
     max_delay: i32,
