@@ -37,8 +37,8 @@ mod server;
 mod state;
 mod world;
 
-const VERSION: &str = "1.21.1";
-const VERSION_NUM: i32 = 767;
+const VERSION: &str = "1.21.4";
+const VERSION_NUM: i32 = 769;
 const TICK_RATE: u8 = 20;
 
 type CrawlState = Arc<state::State>;

@@ -245,7 +245,6 @@ impl SharedPlayer {
             uuid,
             username: Bounded(&username),
             properties: Vec::new(),
-            strict_error_handling: false,
         };
 
         {
