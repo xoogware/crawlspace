@@ -25,7 +25,7 @@ use crate::{
     protocol::{
         datatypes::VarInt,
         packets::{
-            login::registry::{AllRegistries, Registry},
+            login::registry::{AllRegistries, Registry, AllTags},
             play::ChunkDataUpdateLightC,
         },
         Encoder,
@@ -33,6 +33,7 @@ use crate::{
     world::{blocks::Blocks, BlockEntity, Container, World},
     CrawlState,
 };
+use crate::protocol::packets::login::registry::RegistryItem;
 
 #[derive(Debug)]
 pub struct WorldCache {
@@ -119,6 +120,25 @@ impl WorldCache {
         Self {
             encoded,
             containers,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TagCache {
+    pub encoded: Vec<u8>,
+}
+
+impl From<&AllTags> for TagCache {
+    fn from(tags: &AllTags) -> Self {
+        let mut encoder = Encoder::new();
+
+        encoder
+            .append_packet(tags)
+            .expect("Failed to encode tags");
+
+        Self {
+            encoded: encoder.take().to_vec()
         }
     }
 }
