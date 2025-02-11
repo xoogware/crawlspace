@@ -52,6 +52,7 @@ pub struct LoginPlayC<'a> {
     pub is_superflat: bool,
     pub death_location: Option<DeathLocation<'a>>,
     pub portal_cooldown: VarInt,
+    pub sea_level: VarInt,
     pub enforces_secure_chat: bool,
 }
 
@@ -92,7 +93,7 @@ pub struct DeathLocation<'a> {
 }
 
 impl Packet for LoginPlayC<'_> {
-    const ID: i32 = 0x2B;
+    const ID: i32 = 0x2C;
 }
 
 impl<'a> Encode for LoginPlayC<'a> {
@@ -132,6 +133,7 @@ impl<'a> Encode for LoginPlayC<'a> {
         }
 
         self.portal_cooldown.encode(&mut w)?;
+        self.sea_level.encode(&mut w)?;
         self.enforces_secure_chat.encode(&mut w)?;
 
         Ok(())

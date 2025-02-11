@@ -23,7 +23,7 @@ use crate::protocol::{Decode, Encode, Packet};
 pub struct KeepAliveC(pub i64);
 
 impl Packet for KeepAliveC {
-    const ID: i32 = 0x26;
+    const ID: i32 = 0x27;
 }
 
 impl Encode for KeepAliveC {
@@ -37,7 +37,7 @@ impl Encode for KeepAliveC {
 pub struct KeepAliveS(i64);
 
 impl Packet for KeepAliveS {
-    const ID: i32 = 0x18;
+    const ID: i32 = 0x1A;
 }
 
 impl<'a> Decode<'a> for KeepAliveS {

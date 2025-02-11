@@ -28,7 +28,7 @@ pub struct GameEventC {
 }
 
 impl Packet for GameEventC {
-    const ID: i32 = 0x22;
+    const ID: i32 = 0x23;
 }
 
 impl Encode for GameEventC {

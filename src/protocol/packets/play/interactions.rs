@@ -93,7 +93,7 @@ impl TryFrom<VarInt> for Face {
 }
 
 impl Packet for UseItemOnS {
-    const ID: i32 = 0x38;
+    const ID: i32 = 0x3C;
 }
 
 impl Decode<'_> for UseItemOnS {

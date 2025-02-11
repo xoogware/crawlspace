@@ -49,7 +49,6 @@ pub struct LoginSuccessC<'a> {
     pub uuid: Uuid,
     pub username: Bounded<&'a str, 16>,
     pub properties: Vec<Property<'a>>,
-    pub strict_error_handling: bool,
 }
 
 impl Packet for LoginSuccessC<'_> {
@@ -64,7 +63,6 @@ impl<'a> Encode for LoginSuccessC<'a> {
         self.username.encode(&mut w)?;
         properties_len.encode(&mut w)?;
         self.properties.encode(&mut w)?;
-        self.strict_error_handling.encode(&mut w)?;
 
         Ok(())
     }

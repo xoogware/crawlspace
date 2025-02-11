@@ -33,7 +33,7 @@ pub struct OpenScreenC {
 }
 
 impl Packet for OpenScreenC {
-    const ID: i32 = 0x33;
+    const ID: i32 = 0x35;
 }
 
 impl Encode for OpenScreenC {

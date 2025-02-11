@@ -24,10 +24,11 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     args::Args,
-    net::{cache::RegistryCache, player::SharedPlayer},
+    net::{cache::{TagCache, RegistryCache}, player::SharedPlayer},
     protocol::packets::login::registry::ALL_REGISTRIES,
     server::Server,
 };
+use crate::protocol::packets::login::registry::TAGS;
 
 #[derive(Debug)]
 pub struct State {
@@ -41,6 +42,7 @@ pub struct State {
     pub velocity_forwarding: bool,
 
     pub registry_cache: RegistryCache,
+    pub tag_cache: TagCache,
 
     pub player_send: mpsc::Sender<SharedPlayer>,
     pub player_recv: Mutex<mpsc::Receiver<SharedPlayer>>,
@@ -78,6 +80,7 @@ impl State {
             velocity_forwarding: args.velocity_forwarding,
 
             registry_cache: RegistryCache::from(&*ALL_REGISTRIES),
+            tag_cache: TagCache::from(&*TAGS),
 
             player_send,
             player_recv: Mutex::new(player_recv),

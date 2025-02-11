@@ -55,7 +55,7 @@ enum PlayerAction<'a> {
 }
 
 impl Packet for PlayerInfoUpdateC<'_> {
-    const ID: i32 = 0x3E;
+    const ID: i32 = 0x40;
 }
 
 // "I'm a Never-Nester"

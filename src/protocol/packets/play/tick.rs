@@ -26,7 +26,7 @@ pub struct SetTickingStateC {
 }
 
 impl Packet for SetTickingStateC {
-    const ID: i32 = 0x71;
+    const ID: i32 = 0x78;
 }
 
 impl Encode for SetTickingStateC {
@@ -41,7 +41,7 @@ impl Encode for SetTickingStateC {
 pub struct StepTicksC(pub i32);
 
 impl Packet for StepTicksC {
-    const ID: i32 = 0x72;
+    const ID: i32 = 0x79;
 }
 
 impl Encode for StepTicksC {

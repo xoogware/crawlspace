@@ -25,7 +25,6 @@ use super::{RegistryItem, StringOrCompound};
 pub struct TrimMaterial {
     asset_name: String,
     ingredient: String,
-    item_model_index: f32,
     description: StringOrCompound<TrimDescription>,
 }
 

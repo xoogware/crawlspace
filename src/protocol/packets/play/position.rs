@@ -30,7 +30,7 @@ pub struct SetPlayerPositionS {
 }
 
 impl Packet for SetPlayerPositionS {
-    const ID: i32 = 0x1A;
+    const ID: i32 = 0x1C;
 }
 
 impl Decode<'_> for SetPlayerPositionS {
@@ -58,7 +58,7 @@ pub struct SetPlayerPositionAndRotationS {
 }
 
 impl Packet for SetPlayerPositionAndRotationS {
-    const ID: i32 = 0x1B;
+    const ID: i32 = 0x1D;
 }
 
 impl Decode<'_> for SetPlayerPositionAndRotationS {
