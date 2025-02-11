@@ -262,6 +262,7 @@ impl SharedPlayer {
         self.0.io.rx::<KnownPacksS>().await?;
 
         self.0.io.tx_raw(&state.registry_cache.encoded).await?;
+        self.0.io.tx_raw(&state.tag_cache.encoded).await?;
 
         self.0.io.tx(&FinishConfigurationC).await?;
         self.0.io.rx::<FinishConfigurationAckS>().await?;
@@ -312,6 +313,7 @@ impl SharedPlayer {
             is_superflat: false,
             death_location: None,
             portal_cooldown: VarInt(0),
+            sea_level: VarInt(64),
             enforces_secure_chat: false,
         };
 
@@ -434,7 +436,7 @@ impl SharedPlayer {
             };
         }
 
-        let tp = SynchronisePositionC::new(x, y, z, yaw, pitch);
+        let tp = SynchronisePositionC::new(x, y, z, 0.0, 0.0, 0.0, yaw, pitch);
         {
             let mut tp_state = self.0.tp_state.write().await;
             // player will be given 5 (FIVE) SECONDS TO ACK!!!!!

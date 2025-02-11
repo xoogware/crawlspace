@@ -42,7 +42,7 @@ pub struct SetCenterChunkC {
 }
 
 impl Packet for SetCenterChunkC {
-    const ID: i32 = 0x54;
+    const ID: i32 = 0x58;
 }
 
 impl Encode for SetCenterChunkC {
@@ -212,7 +212,7 @@ impl Encode for PalettedContainer {
 }
 
 impl Packet for ChunkDataUpdateLightC<'_> {
-    const ID: i32 = 0x27;
+    const ID: i32 = 0x28;
 }
 
 impl Encode for ChunkDataUpdateLightC<'_> {
@@ -478,7 +478,7 @@ pub struct SetBorderCenterC {
 }
 
 impl Packet for SetBorderCenterC {
-    const ID: i32 = 0x4D;
+    const ID: i32 = 0x52;
 }
 
 impl Encode for SetBorderCenterC {
@@ -493,7 +493,7 @@ impl Encode for SetBorderCenterC {
 pub struct SetBorderSizeC(pub f64);
 
 impl Packet for SetBorderSizeC {
-    const ID: i32 = 0x4F;
+    const ID: i32 = 0x54;
 }
 
 impl Encode for SetBorderSizeC {

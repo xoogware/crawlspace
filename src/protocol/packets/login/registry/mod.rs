@@ -32,6 +32,7 @@ mod dimension;
 mod painting;
 mod trim;
 mod wolf;
+mod tags;
 
 pub use banner::*;
 pub use biome::*;
@@ -41,10 +42,16 @@ pub use dimension::*;
 pub use painting::*;
 pub use trim::*;
 pub use wolf::*;
+pub use tags::*;
 
 pub static ALL_REGISTRIES: LazyLock<AllRegistries> = LazyLock::new(|| {
     serde_json::from_str(include_str!("../../../../../assets/registries.json"))
         .expect("registries.json should be parseable")
+});
+
+pub static TAGS: LazyLock<AllTags> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../../../../assets/tags.json"))
+        .expect("tags.json should be parseable")
 });
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
