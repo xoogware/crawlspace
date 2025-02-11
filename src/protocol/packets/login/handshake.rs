@@ -20,21 +20,20 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use color_eyre::eyre::Result;
 
-use crate::protocol::{
-    datatypes::{Bounded, VarInt},
-    Decode, Packet, PacketState,
-};
+use crate::protocol::{datatypes::{Bounded, VarInt}, Decode, Packet, PacketDirection, PacketState, ProtocolState};
 
 #[derive(Debug)]
 pub struct HandshakeS<'a> {
     pub protocol_version: VarInt,
     _server_address: Bounded<&'a str, 255>,
     _server_port: u16,
-    pub next_state: PacketState,
+    pub next_state: ProtocolState,
 }
 
 impl Packet for HandshakeS<'_> {
-    const ID: i32 = 0x00;
+    const ID: &'static str = "minecraft:intention";
+    const STATE: PacketState = PacketState::Handshake;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl<'a> Decode<'a> for HandshakeS<'a> {
@@ -43,7 +42,7 @@ impl<'a> Decode<'a> for HandshakeS<'a> {
             protocol_version: VarInt::decode(buf)?,
             _server_address: Bounded::<&'a str, 255>::decode(buf)?,
             _server_port: buf.read_u16::<BigEndian>()?,
-            next_state: PacketState::try_from(VarInt::decode(buf)?.0)?,
+            next_state: ProtocolState::try_from(VarInt::decode(buf)?.0)?,
         })
     }
 }

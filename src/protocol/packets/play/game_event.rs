@@ -17,7 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use crate::protocol::{Encode, Packet};
+use crate::protocol::{Encode, Packet, PacketDirection, PacketState};
 
 use super::Gamemode;
 
@@ -28,7 +28,9 @@ pub struct GameEventC {
 }
 
 impl Packet for GameEventC {
-    const ID: i32 = 0x23;
+    const ID: &'static str = "minecraft:game_event";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for GameEventC {

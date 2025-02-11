@@ -17,7 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use crate::protocol::{datatypes::VarInt, Encode, Packet};
+use crate::protocol::{datatypes::VarInt, Encode, Packet, PacketDirection, PacketState};
 
 #[derive(Debug)]
 pub struct SetTickingStateC {
@@ -26,7 +26,9 @@ pub struct SetTickingStateC {
 }
 
 impl Packet for SetTickingStateC {
-    const ID: i32 = 0x78;
+    const ID: &'static str = "minecraft:ticking_state";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for SetTickingStateC {
@@ -41,7 +43,9 @@ impl Encode for SetTickingStateC {
 pub struct StepTicksC(pub i32);
 
 impl Packet for StepTicksC {
-    const ID: i32 = 0x79;
+    const ID: &'static str = "minecraft:ticking_step";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for StepTicksC {

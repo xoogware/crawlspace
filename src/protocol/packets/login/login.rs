@@ -20,10 +20,7 @@
 use color_eyre::eyre::Result;
 use uuid::Uuid;
 
-use crate::protocol::{
-    datatypes::{Bounded, Bytes, Rest, VarInt},
-    Decode, Encode, Packet, Property,
-};
+use crate::protocol::{datatypes::{Bounded, Bytes, Rest, VarInt}, Decode, Encode, Packet, PacketDirection, PacketState, Property};
 
 #[derive(Debug)]
 pub struct LoginStartS<'a> {
@@ -32,7 +29,9 @@ pub struct LoginStartS<'a> {
 }
 
 impl Packet for LoginStartS<'_> {
-    const ID: i32 = 0x00;
+    const ID: &'static str = "minecraft:hello";
+    const STATE: PacketState = PacketState::Login;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl<'a> Decode<'a> for LoginStartS<'a> {
@@ -52,7 +51,9 @@ pub struct LoginSuccessC<'a> {
 }
 
 impl Packet for LoginSuccessC<'_> {
-    const ID: i32 = 0x02;
+    const ID: &'static str = "minecraft:login_finished";
+    const STATE: PacketState = PacketState::Login;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl<'a> Encode for LoginSuccessC<'a> {
@@ -76,7 +77,9 @@ pub struct PluginRequestC<'a> {
 }
 
 impl Packet for PluginRequestC<'_> {
-    const ID: i32 = 0x04;
+    const ID: &'static str = "minecraft:custom_query";
+    const STATE: PacketState = PacketState::Login;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl<'a> Encode for PluginRequestC<'a> {
@@ -96,7 +99,9 @@ pub struct PluginResponseS<'a> {
 }
 
 impl Packet for PluginResponseS<'_> {
-    const ID: i32 = 0x02;
+    const ID: &'static str = "minecraft:custom_query_answer";
+    const STATE: PacketState = PacketState::Login;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl<'a> Decode<'a> for PluginResponseS<'a> {
@@ -112,7 +117,9 @@ impl<'a> Decode<'a> for PluginResponseS<'a> {
 pub struct LoginAckS;
 
 impl Packet for LoginAckS {
-    const ID: i32 = 0x03;
+    const ID: &'static str = "minecraft:login_acknowledged";
+    const STATE: PacketState = PacketState::Login;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl Decode<'_> for LoginAckS {

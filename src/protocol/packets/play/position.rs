@@ -19,7 +19,7 @@
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use crate::protocol::{Decode, Packet};
+use crate::protocol::{Decode, Packet, PacketDirection, PacketState};
 
 #[derive(Debug)]
 pub struct SetPlayerPositionS {
@@ -30,7 +30,9 @@ pub struct SetPlayerPositionS {
 }
 
 impl Packet for SetPlayerPositionS {
-    const ID: i32 = 0x1C;
+    const ID: &'static str = "minecraft:move_player_pos";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl Decode<'_> for SetPlayerPositionS {
@@ -58,7 +60,9 @@ pub struct SetPlayerPositionAndRotationS {
 }
 
 impl Packet for SetPlayerPositionAndRotationS {
-    const ID: i32 = 0x1D;
+    const ID: &'static str = "minecraft:move_player_pos_rot";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl Decode<'_> for SetPlayerPositionAndRotationS {

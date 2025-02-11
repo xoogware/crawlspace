@@ -24,6 +24,7 @@ use crate::{
     },
     server::window::{Window, WindowType},
 };
+use crate::protocol::{PacketDirection, PacketState};
 
 #[derive(Debug)]
 pub struct OpenScreenC {
@@ -33,7 +34,9 @@ pub struct OpenScreenC {
 }
 
 impl Packet for OpenScreenC {
-    const ID: i32 = 0x35;
+    const ID: &'static str = "minecraft:open_screen";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for OpenScreenC {
@@ -66,7 +69,9 @@ pub struct SetContainerContentC {
 }
 
 impl Packet for SetContainerContentC {
-    const ID: i32 = 0x13;
+    const ID: &'static str = "minecraft:container_set_content";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for SetContainerContentC {

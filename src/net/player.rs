@@ -48,7 +48,7 @@ use crate::{
                 SetPlayerPositionS, SetTickingStateC, StepTicksC, SynchronisePositionC, UseItemOnS,
             },
         },
-        Frame, Packet, PacketState,
+        Frame, Packet, ProtocolState,
     },
     server::window::{Window, WindowType},
     CrawlState,
@@ -56,7 +56,7 @@ use crate::{
 
 #[cfg(feature = "encryption")]
 use crate::protocol::{datatypes::Bytes, packets::login::PluginRequestC};
-
+use crate::protocol::{PacketDirection, PACKETS};
 use super::{entity::Entity, io::NetIo};
 
 #[derive(Debug)]
@@ -67,7 +67,7 @@ pub struct Player {
     frame_queue: Mutex<Vec<Frame>>,
 
     crawlstate: CrawlState,
-    packet_state: RwLock<PacketState>,
+    protocol_state: RwLock<ProtocolState>,
 
     uuid: RwLock<Option<Uuid>>,
     tp_state: RwLock<TeleportState>,
@@ -104,7 +104,7 @@ impl SharedPlayer {
             _permit: permit,
 
             crawlstate,
-            packet_state: RwLock::new(PacketState::Handshaking),
+            protocol_state: RwLock::new(ProtocolState::Handshaking),
 
             uuid: RwLock::new(None),
             tp_state: RwLock::new(TeleportState::Clear),
@@ -136,8 +136,8 @@ impl SharedPlayer {
             Err(e) => warn!("Timed out waiting for {} to connect: {e}", self.0.id),
             Ok(Err(why)) => warn!("Error handshaking: {why}"),
             Ok(Ok(())) => {
-                let s = self.0.packet_state.read().await;
-                if let PacketState::Status = *s {
+                let s = self.0.protocol_state.read().await;
+                if let ProtocolState::Status = *s {
                     return;
                 }
                 drop(s);
@@ -170,15 +170,15 @@ impl SharedPlayer {
 
         let next_state = p.next_state;
 
-        let mut s = self.0.packet_state.write().await;
+        let mut s = self.0.protocol_state.write().await;
         match next_state {
-            PacketState::Status => {
-                *s = PacketState::Status;
+            ProtocolState::Status => {
+                *s = ProtocolState::Status;
                 drop(s);
                 self.handle_status().await?;
             }
-            PacketState::Login => {
-                *s = PacketState::Login;
+            ProtocolState::Login => {
+                *s = ProtocolState::Login;
                 drop(s);
                 self.login().await?;
             }
@@ -212,9 +212,11 @@ impl SharedPlayer {
         };
 
         self.0.io.tx(&res).await?;
-        let ping: Ping = self.0.io.rx::<Ping>().await?.decode()?;
+        let ping: PingS = self.0.io.rx::<PingS>().await?.decode()?;
 
-        self.0.io.tx(&ping).await?;
+        self.0.io.tx(&PingC {
+            payload: ping.payload
+        }).await?;
 
         Ok(())
     }
@@ -287,8 +289,8 @@ impl SharedPlayer {
     }
 
     async fn begin_play(&self) -> Result<()> {
-        let mut packet_state = self.0.packet_state.write().await;
-        *packet_state = PacketState::Play;
+        let mut packet_state = self.0.protocol_state.write().await;
+        *packet_state = ProtocolState::Play;
 
         let state = self.0.crawlstate.clone();
 
@@ -526,7 +528,15 @@ impl SharedPlayer {
     }
 
     async fn handle_frame(&self, frame: Frame) -> Result<()> {
-        match frame.id {
+        let packet_state = self.0.protocol_state.read().await.to_owned().into();
+        let resource = PACKETS
+            .get_resource_id(packet_state, PacketDirection::Serverbound, frame.id)
+            .unwrap_or_else(|| {
+                panic!("{} cannot map to any resource in state {:?}", frame.id, packet_state)
+            })
+            .as_str();
+
+        match resource {
             SetPlayerPositionS::ID => {
                 let packet: SetPlayerPositionS = frame.decode()?;
 

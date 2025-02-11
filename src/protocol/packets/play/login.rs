@@ -17,10 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use crate::protocol::{
-    datatypes::{Bounded, Position, VarInt},
-    Encode, Packet,
-};
+use crate::protocol::{datatypes::{Bounded, Position, VarInt}, Encode, Packet, PacketDirection, PacketState};
 
 #[derive(Debug)]
 pub struct LoginPlayC<'a> {
@@ -93,7 +90,9 @@ pub struct DeathLocation<'a> {
 }
 
 impl Packet for LoginPlayC<'_> {
-    const ID: i32 = 0x2C;
+    const ID: &'static str = "minecraft:login";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl<'a> Encode for LoginPlayC<'a> {

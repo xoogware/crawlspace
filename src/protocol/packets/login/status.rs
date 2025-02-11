@@ -22,13 +22,15 @@ use std::io::Write;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use color_eyre::eyre::Result;
 
-use crate::protocol::{Decode, Encode, Packet};
+use crate::protocol::{Decode, Encode, Packet, PacketDirection, PacketState};
 
 #[derive(Debug)]
 pub struct StatusRequestS;
 
 impl Packet for StatusRequestS {
-    const ID: i32 = 0x00;
+    const ID: &'static str = "minecraft:status_request";
+    const STATE: PacketState = PacketState::Status;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl<'a> Decode<'a> for StatusRequestS {
@@ -43,7 +45,9 @@ pub struct StatusResponseC<'a> {
 }
 
 impl<'a> Packet for StatusResponseC<'a> {
-    const ID: i32 = 0x00;
+    const ID: &'static str = "minecraft:status_response";
+    const STATE: PacketState = PacketState::Status;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl<'a> Encode for StatusResponseC<'a> {
@@ -53,24 +57,37 @@ impl<'a> Encode for StatusResponseC<'a> {
 }
 
 #[derive(Debug)]
-pub struct Ping {
-    payload: i64,
+pub struct PingC {
+    pub payload: i64,
 }
 
-impl Packet for Ping {
-    const ID: i32 = 0x01;
+#[derive(Debug)]
+pub struct PingS {
+    pub payload: i64,
 }
 
-impl<'a> Decode<'a> for Ping {
+impl Packet for PingC {
+    const ID: &'static str = "minecraft:ping";
+    const STATE: PacketState = PacketState::Status;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
+}
+
+impl Packet for PingS {
+    const ID: &'static str = "minecraft:pong";
+    const STATE: PacketState = PacketState::Status;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
+}
+
+impl Encode for PingC {
+    fn encode(&self, mut w: impl Write) -> Result<()> {
+        Ok(w.write_i64::<BigEndian>(self.payload)?)
+    }
+}
+
+impl<'a> Decode<'a> for PingS {
     fn decode(buf: &mut &'a [u8]) -> Result<Self> {
         Ok(Self {
             payload: buf.read_i64::<BigEndian>()?,
         })
-    }
-}
-
-impl Encode for Ping {
-    fn encode(&self, mut w: impl Write) -> Result<()> {
-        Ok(w.write_i64::<BigEndian>(self.payload)?)
     }
 }

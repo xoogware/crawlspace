@@ -19,10 +19,7 @@
 
 use color_eyre::eyre::{ensure, Result};
 
-use crate::protocol::{
-    datatypes::{Bounded, VarInt},
-    Decode, DecodeSized, Encode, Packet,
-};
+use crate::protocol::{datatypes::{Bounded, VarInt}, Decode, DecodeSized, Encode, Packet, PacketDirection, PacketState, ProtocolState};
 
 #[derive(Debug)]
 pub struct KnownPacksC<'a> {
@@ -38,7 +35,9 @@ pub struct KnownPack<'a> {
 }
 
 impl Packet for KnownPacksC<'_> {
-    const ID: i32 = 0x0E;
+    const ID: &'static str = "minecraft:select_known_packs";
+    const STATE: PacketState = PacketState::Configuration;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for KnownPacksC<'_> {
@@ -87,7 +86,9 @@ pub struct KnownPacksS<'a> {
 }
 
 impl Packet for KnownPacksS<'_> {
-    const ID: i32 = 0x07;
+    const ID: &'static str = "minecraft:select_known_packs";
+    const STATE: PacketState = PacketState::Configuration;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl<'a> Decode<'a> for KnownPacksS<'a> {
@@ -116,7 +117,9 @@ impl<'a> Decode<'a> for KnownPack<'a> {
 pub struct FinishConfigurationC;
 
 impl Packet for FinishConfigurationC {
-    const ID: i32 = 0x03;
+    const ID: &'static str = "minecraft:finish_configuration";
+    const STATE: PacketState = PacketState::Configuration;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for FinishConfigurationC {
@@ -129,7 +132,9 @@ impl Encode for FinishConfigurationC {
 pub struct FinishConfigurationAckS;
 
 impl Packet for FinishConfigurationAckS {
-    const ID: i32 = 0x03;
+    const ID: &'static str = "minecraft:finish_configuration";
+    const STATE: PacketState = PacketState::Configuration;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl<'a> Decode<'a> for FinishConfigurationAckS {

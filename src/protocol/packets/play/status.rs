@@ -19,10 +19,7 @@
 
 use uuid::Uuid;
 
-use crate::protocol::{
-    datatypes::{Bounded, VarInt},
-    Encode, Packet, Property,
-};
+use crate::protocol::{datatypes::{Bounded, VarInt}, Encode, Packet, PacketDirection, PacketState, Property};
 
 use super::Gamemode;
 
@@ -55,7 +52,9 @@ enum PlayerAction<'a> {
 }
 
 impl Packet for PlayerInfoUpdateC<'_> {
-    const ID: i32 = 0x40;
+    const ID: &'static str = "minecraft:player_info_update";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 // "I'm a Never-Nester"

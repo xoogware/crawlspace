@@ -86,11 +86,11 @@ impl NetIo {
             let mut decoder = self.decoder.lock().await;
             loop {
                 if let Some(frame) = decoder.try_read_next().context("failed try_read_next")? {
-                    if frame.id != P::ID {
+                    if frame.id != P::get_id() {
                         debug!(
                             "Got packet ID {} while awaiting {}, discarding",
                             frame.id,
-                            P::ID
+                            P::get_id()
                         );
                         continue;
                     }

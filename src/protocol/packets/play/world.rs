@@ -34,6 +34,7 @@ use crate::{
     },
     CrawlState,
 };
+use crate::protocol::{PacketDirection, PacketState};
 
 #[derive(Debug)]
 pub struct SetCenterChunkC {
@@ -42,7 +43,9 @@ pub struct SetCenterChunkC {
 }
 
 impl Packet for SetCenterChunkC {
-    const ID: i32 = 0x58;
+    const ID: &'static str = "minecraft:set_chunk_cache_center";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for SetCenterChunkC {
@@ -212,7 +215,9 @@ impl Encode for PalettedContainer {
 }
 
 impl Packet for ChunkDataUpdateLightC<'_> {
-    const ID: i32 = 0x28;
+    const ID: &'static str = "minecraft:level_chunk_with_light";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for ChunkDataUpdateLightC<'_> {
@@ -454,7 +459,9 @@ pub struct InitializeWorldBorderC {
 }
 
 impl Packet for InitializeWorldBorderC {
-    const ID: i32 = 0x25;
+    const ID: &'static str = "minecraft:initialize_border";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for InitializeWorldBorderC {
@@ -478,7 +485,9 @@ pub struct SetBorderCenterC {
 }
 
 impl Packet for SetBorderCenterC {
-    const ID: i32 = 0x52;
+    const ID: &'static str = "minecraft:set_border_center";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for SetBorderCenterC {
@@ -493,7 +502,9 @@ impl Encode for SetBorderCenterC {
 pub struct SetBorderSizeC(pub f64);
 
 impl Packet for SetBorderSizeC {
-    const ID: i32 = 0x54;
+    const ID: &'static str = "minecraft:set_border_size";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for SetBorderSizeC {

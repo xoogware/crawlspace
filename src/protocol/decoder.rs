@@ -49,9 +49,9 @@ impl Frame {
         P: ServerboundPacket<'a>,
     {
         ensure!(
-            P::ID == self.id,
+            P::get_id() == self.id,
             "Mismatched packet IDs: expected {} got {}",
-            P::ID,
+            P::get_id(),
             self.id
         );
 

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::protocol::{Encode, Packet};
+use crate::protocol::{Encode, Packet, PacketDirection, PacketState};
 use crate::protocol::datatypes::{Bounded, VarInt};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -9,7 +9,9 @@ pub struct AllTags(pub HashMap<String, Tags>);
 pub struct Tags(pub HashMap<String, Vec<String>>);
 
 impl Packet for AllTags {
-    const ID: i32 = 0x0D;
+    const ID: &'static str = "minecraft:update_tags";
+    const STATE: PacketState = PacketState::Configuration;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for AllTags {

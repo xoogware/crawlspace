@@ -78,13 +78,85 @@ mod decoder;
 mod encoder;
 
 use std::{fmt::Debug, io::Write};
-
+use std::collections::HashMap;
+use std::sync::LazyLock;
 use bit_vec::BitVec;
 use color_eyre::eyre::{Context, Result};
+use serde::{Deserialize, Serialize};
 use datatypes::{Bounded, VarInt};
+use thiserror::Error;
+
 pub use decoder::*;
 pub use encoder::*;
-use thiserror::Error;
+
+pub static PACKETS: LazyLock<Packets> = LazyLock::new(|| {
+    Packets::new(
+        serde_json::from_str(include_str!("../../assets/packets.json"))
+            .expect("packets.json should be parseable")
+    )
+});
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct PacketType {
+    pub protocol_id: i32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ForwardPackets(pub HashMap<PacketState, HashMap<PacketDirection, HashMap<String, PacketType>>>);
+
+#[derive(Clone, Debug)]
+pub struct Packets {
+    forward: ForwardPackets,
+    reverse: HashMap<PacketState, HashMap<PacketDirection, HashMap<i32, String>>>
+}
+
+impl Packets {
+    pub fn new(forward: ForwardPackets) -> Self {
+        Self {
+            reverse: Self::build_reverse(&forward),
+            forward
+        }
+    }
+
+    pub fn get_protocol_id(&self, state: PacketState, direction: PacketDirection, name: &str) -> Option<i32> {
+        Some(
+            self.forward
+                .0.get(&state)
+                ?.get(&direction)
+                ?.get(name.into())
+                ?.protocol_id
+        )
+    }
+
+    pub fn get_resource_id(&self, state: PacketState, direction: PacketDirection, protocol_id: i32) -> Option<&String> {
+        Some(
+            self.reverse
+                .get(&state)
+                ?.get(&direction)
+                ?.get(&protocol_id)?
+        )
+    }
+
+    fn build_reverse(forward: &ForwardPackets) -> HashMap<PacketState, HashMap<PacketDirection, HashMap<i32, String>>> {
+        let mut reverse = HashMap::new();
+
+        for state in forward.0.keys() {
+            let direction_mapping = reverse
+                .entry(*state)
+                .or_insert_with(|| { HashMap::new() })
+                .entry(PacketDirection::Serverbound)
+                .or_insert_with(|| { HashMap::new() });
+
+            for (key, value) in forward.0.get(&state).unwrap().get(&PacketDirection::Serverbound).unwrap() {
+                direction_mapping
+                    .entry(value.protocol_id)
+                    .or_insert_with(move || { key.clone() });
+            }
+        }
+
+        reverse
+    }
+}
 
 const MAX_PACKET_SIZE: i32 = 2097152;
 
@@ -102,8 +174,25 @@ pub trait DecodeSized<'a>: Sized {
     fn decode(times: usize, r: &mut &'a [u8]) -> Result<Self>;
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PacketDirection {
+    Clientbound,
+    Serverbound,
+}
+
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum PacketState {
+    Handshake,
+    Login,
+    Configuration,
+    Play,
+    Status
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ProtocolState {
     Handshaking,
     Play,
     Status,
@@ -112,29 +201,58 @@ pub enum PacketState {
 }
 
 #[derive(Error, Debug)]
-pub enum PacketStateDecodeError {
+pub enum ProtocolStateDecodeError {
     #[error("Unable to decode {0} into a PacketState")]
     InvalidState(i32),
 }
 
-impl TryFrom<i32> for PacketState {
-    type Error = PacketStateDecodeError;
+impl Into<PacketState> for ProtocolState {
+    fn into(self) -> PacketState {
+        match self {
+            ProtocolState::Handshaking => PacketState::Handshake,
+            ProtocolState::Play => PacketState::Play,
+            ProtocolState::Status => PacketState::Status,
+            ProtocolState::Login => PacketState::Login,
+            ProtocolState::Transfer => PacketState::Login
+        }
+    }
+}
+
+impl TryFrom<i32> for ProtocolState {
+    type Error = ProtocolStateDecodeError;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
-            1 => Ok(PacketState::Status),
-            2 => Ok(PacketState::Login),
-            3 => Ok(PacketState::Transfer),
-            i => Err(PacketStateDecodeError::InvalidState(i)),
+            1 => Ok(ProtocolState::Status),
+            2 => Ok(ProtocolState::Login),
+            3 => Ok(ProtocolState::Transfer),
+            i => Err(ProtocolStateDecodeError::InvalidState(i)),
         }
     }
 }
 
 pub trait Packet {
-    const ID: i32;
+    const ID: &'static str;
+    const STATE: PacketState;
+    const DIRECTION: PacketDirection;
+
+    fn get_id() -> i32 {
+        PACKETS
+            .get_protocol_id(Self::STATE, Self::DIRECTION, Self::ID)
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected packet {:?}/{} ({:?}) to exist",
+                    Self::STATE,
+                    Self::ID,
+                    Self::DIRECTION
+                )
+            })
+    }
 }
 
-pub trait ServerboundPacket<'a>: Packet + Decode<'a> + Debug {}
+pub trait ServerboundPacket<'a>: Packet + Decode<'a> + Debug {
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
+}
 impl<'a, P> ServerboundPacket<'a> for P where P: Packet + Decode<'a> + Debug {}
 
 pub trait ClientboundPacket: Packet + Encode + Debug {
@@ -142,7 +260,7 @@ pub trait ClientboundPacket: Packet + Encode + Debug {
     where
         Self: Encode,
     {
-        VarInt(Self::ID)
+        VarInt(Self::get_id())
             .encode(&mut w)
             .context("Failed to encode packet id")?;
 

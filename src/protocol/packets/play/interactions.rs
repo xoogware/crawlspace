@@ -19,10 +19,7 @@
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use crate::protocol::{
-    datatypes::{Position, VarInt},
-    Decode, Packet,
-};
+use crate::protocol::{datatypes::{Position, VarInt}, Decode, Packet, PacketDirection, PacketState};
 
 #[derive(Debug)]
 pub struct UseItemOnS {
@@ -33,6 +30,7 @@ pub struct UseItemOnS {
     pub cursor_y: f32,
     pub cursor_z: f32,
     pub inside_block: bool,
+    pub world_border_hit: bool,
     pub sequence: VarInt,
 }
 
@@ -93,7 +91,9 @@ impl TryFrom<VarInt> for Face {
 }
 
 impl Packet for UseItemOnS {
-    const ID: i32 = 0x3C;
+    const ID: &'static str = "minecraft:use_item_on";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl Decode<'_> for UseItemOnS {
@@ -109,6 +109,7 @@ impl Decode<'_> for UseItemOnS {
             cursor_y: r.read_f32::<BigEndian>()?,
             cursor_z: r.read_f32::<BigEndian>()?,
             inside_block: r.read_u8()? == 1,
+            world_border_hit: r.read_u8()? == 1,
             sequence: VarInt::decode(r)?,
         })
     }

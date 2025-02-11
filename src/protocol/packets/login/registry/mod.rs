@@ -22,7 +22,7 @@ use std::{collections::HashMap, sync::LazyLock};
 use fastnbt::SerOpts;
 use serde::{de, Deserialize, Serialize};
 
-use crate::protocol::{datatypes::VarInt, Encode, Packet};
+use crate::protocol::{datatypes::VarInt, Encode, Packet, PacketDirection, PacketState};
 
 mod banner;
 mod biome;
@@ -75,7 +75,9 @@ impl<T> Packet for Registry<T>
 where
     T: RegistryItem,
 {
-    const ID: i32 = 0x07;
+    const ID: &'static str = "minecraft:registry_data";
+    const STATE: PacketState = PacketState::Configuration;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

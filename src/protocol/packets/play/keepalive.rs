@@ -17,13 +17,15 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use crate::protocol::{Decode, Encode, Packet};
+use crate::protocol::{Decode, Encode, Packet, PacketDirection, PacketState};
 
 #[derive(Debug)]
 pub struct KeepAliveC(pub i64);
 
 impl Packet for KeepAliveC {
-    const ID: i32 = 0x27;
+    const ID: &'static str = "minecraft:keep_alive";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for KeepAliveC {
@@ -37,7 +39,9 @@ impl Encode for KeepAliveC {
 pub struct KeepAliveS(i64);
 
 impl Packet for KeepAliveS {
-    const ID: i32 = 0x1A;
+    const ID: &'static str = "minecraft:keep_alive";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl<'a> Decode<'a> for KeepAliveS {

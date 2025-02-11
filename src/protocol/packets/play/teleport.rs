@@ -19,7 +19,7 @@
 
 use std::sync::atomic::{AtomicI32, Ordering};
 
-use crate::protocol::{datatypes::VarInt, Decode, Encode, Packet};
+use crate::protocol::{datatypes::VarInt, Decode, Encode, Packet, PacketDirection, PacketState};
 
 static TP_ID: AtomicI32 = AtomicI32::new(0);
 
@@ -123,7 +123,9 @@ impl SynchronisePositionC {
 }
 
 impl Packet for SynchronisePositionC {
-    const ID: i32 = 0x42;
+    const ID: &'static str = "minecraft:player_position";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for SynchronisePositionC {
@@ -149,7 +151,9 @@ pub struct ConfirmTeleportS {
 }
 
 impl Packet for ConfirmTeleportS {
-    const ID: i32 = 0x00;
+    const ID: &'static str = "minecraft:accept_teleportation";
+    const STATE: PacketState = PacketState::Play;
+    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl Decode<'_> for ConfirmTeleportS {
