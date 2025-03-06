@@ -57,7 +57,7 @@ impl<'a, const BOUND: usize> Encode for Bounded<&'a str, BOUND> {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         let len = self.0.encode_utf16().count();
 
-        ensure!(len < BOUND, "length of string {len} exceeds bound {BOUND}");
+        ensure!(len <= BOUND, "length of string {len} exceeds bound {BOUND}");
 
         VarInt(self.0.len() as i32).encode(&mut w)?;
         Ok(w.write_all(self.0.as_bytes())?)
@@ -74,7 +74,7 @@ impl Encode for str {
 impl<'a, const BOUND: usize> Encode for Bounded<Bytes<'a>, BOUND> {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         let len = self.0 .0.len();
-        ensure!(len < BOUND, "length of bytes {len} exceeds bound {BOUND}");
+        ensure!(len <= BOUND, "length of bytes {len} exceeds bound {BOUND}");
         VarInt(len as i32).encode(&mut w)?;
         self.0.encode(&mut w)
     }
@@ -131,7 +131,7 @@ impl<'a, const BOUND: usize> Encode for Rest<&'a str, BOUND> {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         let len = self.0.encode_utf16().count();
 
-        ensure!(len < BOUND, "length of string {len} exceeds bound {BOUND}");
+        ensure!(len <= BOUND, "length of string {len} exceeds bound {BOUND}");
 
         Ok(w.write_all(self.0.as_bytes())?)
     }
@@ -141,7 +141,7 @@ impl<'a, const BOUND: usize> Encode for Rest<Bytes<'a>, BOUND> {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         let len = self.0.0.len();
 
-        ensure!(len < BOUND, "length of bytes {len} exceeds bound {BOUND}");
+        ensure!(len <= BOUND, "length of bytes {len} exceeds bound {BOUND}");
 
         self.0.encode(&mut w)
     }
