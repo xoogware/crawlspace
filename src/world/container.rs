@@ -40,7 +40,7 @@ impl TryFrom<BlockEntity> for Container {
             "minecraft:chest" | "minecraft:trapped_chest" | "minecraft:barrel" => {
                 let items = value
                     .try_get_items()
-                    .map_err(|e| ContainerCreationError::ParseError(e))?;
+                    .map_err(ContainerCreationError::ParseError)?;
 
                 let mut slots = vec![Slot::default(); 27];
 

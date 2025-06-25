@@ -25,7 +25,7 @@ use std::{
     time::Duration,
 };
 
-use color_eyre::eyre::{bail, Result};
+use color_eyre::eyre::{bail, Context, Result};
 use rand::Rng;
 use serde_json::json;
 use thiserror::Error;
@@ -51,13 +51,14 @@ use crate::{
         Frame, Packet, ProtocolState,
     },
     server::window::{Window, WindowType},
+    world::Container,
     CrawlState,
 };
 
+use super::{entity::Entity, io::NetIo};
 #[cfg(feature = "encryption")]
 use crate::protocol::{datatypes::Bytes, packets::login::PluginRequestC};
 use crate::protocol::{PacketDirection, PACKETS};
-use super::{entity::Entity, io::NetIo};
 
 #[derive(Debug)]
 pub struct Player {
@@ -148,7 +149,7 @@ impl SharedPlayer {
                 );
 
                 match self.begin_play().await {
-                    Ok(()) => debug!("Play loop for {} done.", self.id()),
+                    Ok(()) => debug!("Spawned play loop for player {}.", self.id()),
                     Err(why) => error!("Failed to play player {}! {why}", self.id()),
                 }
             }
@@ -214,9 +215,12 @@ impl SharedPlayer {
         self.0.io.tx(&res).await?;
         let ping: PingS = self.0.io.rx::<PingS>().await?.decode()?;
 
-        self.0.io.tx(&PingC {
-            payload: ping.payload
-        }).await?;
+        self.0
+            .io
+            .tx(&PingC {
+                payload: ping.payload,
+            })
+            .await?;
 
         Ok(())
     }
@@ -532,7 +536,10 @@ impl SharedPlayer {
         let resource = PACKETS
             .get_resource_id(packet_state, PacketDirection::Serverbound, frame.id)
             .unwrap_or_else(|| {
-                panic!("{} cannot map to any resource in state {:?}", frame.id, packet_state)
+                panic!(
+                    "{} cannot map to any resource in state {:?}",
+                    frame.id, packet_state
+                )
             })
             .as_str();
 
@@ -569,7 +576,7 @@ impl SharedPlayer {
             }
 
             id => {
-                debug!(
+                trace!(
                     "Got packet with id {id} from player {}, ignoring",
                     self.0.id
                 );
@@ -583,49 +590,56 @@ impl SharedPlayer {
         let crawlstate = self.0.crawlstate.clone();
         let server = crawlstate.get_server().await;
 
-        let x = packet.location.x as i32;
-        let y = packet.location.y as i32;
-        let z = packet.location.z as i32;
+        let x = packet.location.x;
+        let y = packet.location.y;
+        let z = packet.location.z;
 
         debug!("Player {} clicked at {}, {}, {}", self.id(), x, y, z);
 
         match server.get_container(x, y, z) {
             None => (),
-            Some(container) => {
-                let id = {
-                    let mut next_window_id = self.0.next_window_id.lock().await;
-                    let id = *next_window_id;
-                    *next_window_id = next_window_id.wrapping_add(1);
-                    if *next_window_id == 0 {
-                        *next_window_id = 1;
-                    }
-                    id
-                };
+            Some(container) => self
+                .open_container(container)
+                .await
+                .wrap_err_with(|| format!("failed to open container at {x}, {y}, {z}"))?,
+        }
 
-                let window = Window {
-                    id,
-                    kind: WindowType::Generic9x3,
-                    title: "Hi".into(),
-                };
+        Ok(())
+    }
 
-                self.0.io.tx(&OpenScreenC::from(&window)).await?;
-
-                self.0
-                    .io
-                    .tx(&SetContainerContentC {
-                        window_id: id,
-                        // FIXME: track this correctly
-                        state_id: 0,
-                        slot_data: container.0,
-                        carried_item: Slot::default(),
-                    })
-                    .await?;
-
-                {
-                    let mut sw = self.0.window.write().await;
-                    *sw = Some(window);
-                }
+    async fn open_container(&self, container: Container) -> Result<()> {
+        let id = {
+            let mut next_window_id = self.0.next_window_id.lock().await;
+            let id = *next_window_id;
+            *next_window_id = next_window_id.wrapping_add(1);
+            if *next_window_id == 0 {
+                *next_window_id = 1;
             }
+            id
+        };
+
+        let window = Window {
+            id,
+            kind: WindowType::Generic9x3,
+            title: "Hi".into(),
+        };
+
+        self.0.io.tx(&OpenScreenC::from(&window)).await?;
+
+        self.0
+            .io
+            .tx(&SetContainerContentC {
+                window_id: id,
+                // FIXME: track this correctly
+                state_id: 0,
+                slot_data: container.0,
+                carried_item: Slot::default(),
+            })
+            .await?;
+
+        {
+            let mut sw = self.0.window.write().await;
+            *sw = Some(window);
         }
 
         Ok(())

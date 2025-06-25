@@ -77,13 +77,13 @@ pub mod packets {
 mod decoder;
 mod encoder;
 
-use std::{fmt::Debug, io::Write};
-use std::collections::HashMap;
-use std::sync::LazyLock;
 use bit_vec::BitVec;
 use color_eyre::eyre::{Context, Result};
-use serde::{Deserialize, Serialize};
 use datatypes::{Bounded, VarInt};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::LazyLock;
+use std::{fmt::Debug, io::Write};
 use thiserror::Error;
 
 pub use decoder::*;
@@ -92,7 +92,7 @@ pub use encoder::*;
 pub static PACKETS: LazyLock<Packets> = LazyLock::new(|| {
     Packets::new(
         serde_json::from_str(include_str!("../../assets/packets.json"))
-            .expect("packets.json should be parseable")
+            .expect("packets.json should be parseable"),
     )
 });
 
@@ -102,55 +102,71 @@ pub struct PacketType {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct ForwardPackets(pub HashMap<PacketState, HashMap<PacketDirection, HashMap<String, PacketType>>>);
+pub struct ForwardPackets(
+    pub HashMap<PacketState, HashMap<PacketDirection, HashMap<String, PacketType>>>,
+);
 
 #[derive(Clone, Debug)]
 pub struct Packets {
     forward: ForwardPackets,
-    reverse: HashMap<PacketState, HashMap<PacketDirection, HashMap<i32, String>>>
+    reverse: HashMap<PacketState, HashMap<PacketDirection, HashMap<i32, String>>>,
 }
 
 impl Packets {
     pub fn new(forward: ForwardPackets) -> Self {
         Self {
             reverse: Self::build_reverse(&forward),
-            forward
+            forward,
         }
     }
 
-    pub fn get_protocol_id(&self, state: PacketState, direction: PacketDirection, name: &str) -> Option<i32> {
+    pub fn get_protocol_id(
+        &self,
+        state: PacketState,
+        direction: PacketDirection,
+        name: &str,
+    ) -> Option<i32> {
         Some(
             self.forward
-                .0.get(&state)
-                ?.get(&direction)
-                ?.get(name.into())
-                ?.protocol_id
+                .0
+                .get(&state)?
+                .get(&direction)?
+                .get(name)?
+                .protocol_id,
         )
     }
 
-    pub fn get_resource_id(&self, state: PacketState, direction: PacketDirection, protocol_id: i32) -> Option<&String> {
-        Some(
-            self.reverse
-                .get(&state)
-                ?.get(&direction)
-                ?.get(&protocol_id)?
-        )
+    pub fn get_resource_id(
+        &self,
+        state: PacketState,
+        direction: PacketDirection,
+        protocol_id: i32,
+    ) -> Option<&String> {
+        self.reverse.get(&state)?.get(&direction)?.get(&protocol_id)
     }
 
-    fn build_reverse(forward: &ForwardPackets) -> HashMap<PacketState, HashMap<PacketDirection, HashMap<i32, String>>> {
+    fn build_reverse(
+        forward: &ForwardPackets,
+    ) -> HashMap<PacketState, HashMap<PacketDirection, HashMap<i32, String>>> {
         let mut reverse = HashMap::new();
 
         for state in forward.0.keys() {
             let direction_mapping = reverse
                 .entry(*state)
-                .or_insert_with(|| { HashMap::new() })
+                .or_insert_with(HashMap::new)
                 .entry(PacketDirection::Serverbound)
-                .or_insert_with(|| { HashMap::new() });
+                .or_insert_with(HashMap::new);
 
-            for (key, value) in forward.0.get(&state).unwrap().get(&PacketDirection::Serverbound).unwrap() {
+            for (key, value) in forward
+                .0
+                .get(state)
+                .unwrap()
+                .get(&PacketDirection::Serverbound)
+                .unwrap()
+            {
                 direction_mapping
                     .entry(value.protocol_id)
-                    .or_insert_with(move || { key.clone() });
+                    .or_insert_with(move || key.clone());
             }
         }
 
@@ -188,7 +204,7 @@ pub enum PacketState {
     Login,
     Configuration,
     Play,
-    Status
+    Status,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -206,14 +222,14 @@ pub enum ProtocolStateDecodeError {
     InvalidState(i32),
 }
 
-impl Into<PacketState> for ProtocolState {
-    fn into(self) -> PacketState {
-        match self {
+impl From<ProtocolState> for PacketState {
+    fn from(value: ProtocolState) -> Self {
+        match value {
             ProtocolState::Handshaking => PacketState::Handshake,
             ProtocolState::Play => PacketState::Play,
             ProtocolState::Status => PacketState::Status,
             ProtocolState::Login => PacketState::Login,
-            ProtocolState::Transfer => PacketState::Login
+            ProtocolState::Transfer => PacketState::Login,
         }
     }
 }

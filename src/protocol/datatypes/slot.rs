@@ -21,7 +21,7 @@ use crate::{protocol::Encode, server::registries::REGISTRIES, world::Item};
 
 use super::VarInt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Slot {
     item_count: i8,
     item_id: Option<i32>,
@@ -46,17 +46,6 @@ impl From<Item> for Slot {
         Self {
             item_count: value.count as i8,
             item_id: Some(item_id),
-            components_to_add: None,
-            components_to_remove: None,
-        }
-    }
-}
-
-impl Default for Slot {
-    fn default() -> Self {
-        Self {
-            item_count: 0,
-            item_id: None,
             components_to_add: None,
             components_to_remove: None,
         }

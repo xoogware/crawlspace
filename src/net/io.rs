@@ -107,7 +107,7 @@ impl NetIo {
                 if read_half
                     .read_buf(&mut buf)
                     .await
-                    .context("failed read_buf")?
+                    .wrap_err("failed read_buf")?
                     == 0
                 {
                     let mut c = self.connected.write().await;
@@ -132,18 +132,24 @@ impl NetIo {
         trace!("raw packet is {} bytes", bytes.len());
         trace!("{:?}", bytes.to_vec());
         let mut writer = self.write_half.lock().await;
-        Ok(writer.write_all(&bytes).await?)
+        writer
+            .write_all(&bytes)
+            .await
+            .wrap_err("failed to write bytes")
     }
 
     pub async fn tx_raw(&self, packet: &[u8]) -> Result<()> {
         trace!("Sending packet {:?}", packet);
         let mut writer = self.write_half.lock().await;
-        Ok(writer.write_all(packet).await?)
+        writer
+            .write_all(packet)
+            .await
+            .wrap_err("failed to write bytes")
     }
 
     pub async fn rx_raw(&self) -> Result<Frame> {
         let mut decoder = self.decoder.lock().await;
-        if let Some(frame) = decoder.try_read_next().context("failed try_read_next")? {
+        if let Some(frame) = decoder.try_read_next().wrap_err("failed try_read_next")? {
             return Ok(frame);
         };
 
@@ -152,7 +158,12 @@ impl NetIo {
 
         {
             let mut reader = self.read_half.lock().await;
-            if reader.read_buf(&mut buf).await.context("failed read_buf")? == 0 {
+            if reader
+                .read_buf(&mut buf)
+                .await
+                .wrap_err("failed read_buf")?
+                == 0
+            {
                 let mut c = self.connected.write().await;
                 *c = false;
                 return Err(std::io::Error::from(ErrorKind::UnexpectedEof).into());

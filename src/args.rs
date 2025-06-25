@@ -31,7 +31,7 @@ pub struct Args {
     #[arg(short, long, default_value = "25565", env = "LIMBO_PORT")]
     pub port: u16,
     // Whether or not to enable Velocity forwarding.
-    #[arg(short, long, default_value = "true", env = "LIMBO_VELOCITY_FORWARDING")]
+    #[arg(short, long, env = "LIMBO_VELOCITY_FORWARDING")]
     pub velocity_forwarding: bool,
     /// The x coordinate of the spawnpoint.
     #[arg(short = 'x', long, default_value = "0", env = "LIMBO_SPAWN_X")]

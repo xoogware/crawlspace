@@ -52,6 +52,7 @@ mod flags {
 
 #[allow(unused)]
 impl SynchronisePositionC {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         x: f64,
         y: f64,
@@ -60,7 +61,7 @@ impl SynchronisePositionC {
         velocity_y: f64,
         velocity_z: f64,
         yaw: f32,
-        pitch: f32
+        pitch: f32,
     ) -> Self {
         Self {
             x,

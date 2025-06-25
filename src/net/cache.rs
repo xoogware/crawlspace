@@ -25,7 +25,7 @@ use crate::{
     protocol::{
         datatypes::VarInt,
         packets::{
-            login::registry::{AllRegistries, Registry, AllTags},
+            login::registry::{AllRegistries, AllTags, Registry},
             play::ChunkDataUpdateLightC,
         },
         Encoder,
@@ -33,7 +33,6 @@ use crate::{
     world::{blocks::Blocks, BlockEntity, Container, World},
     CrawlState,
 };
-use crate::protocol::packets::login::registry::RegistryItem;
 
 #[derive(Debug)]
 pub struct WorldCache {
@@ -57,7 +56,7 @@ impl WorldCache {
 
         let containers = chunks
             .iter()
-            .map(|(_, c)| {
+            .flat_map(|(_, c)| {
                 c.block_entities
                     .iter()
                     .filter_map(|block_entity| {
@@ -78,9 +77,7 @@ impl WorldCache {
                                 },
                             );
 
-                        let Some(block_entity) = block_entity else {
-                            return None;
-                        };
+                        let block_entity = block_entity?;
 
                         match block_entity.id.as_str() {
                             "minecraft:chest" | "minecraft:trapped_chest" | "minecraft:barrel" => {
@@ -97,7 +94,6 @@ impl WorldCache {
                     })
                     .collect::<Vec<((i32, i32, i32), Container)>>()
             })
-            .flatten()
             .collect();
 
         debug!("Containers: {:?}", containers);
@@ -133,12 +129,10 @@ impl From<&AllTags> for TagCache {
     fn from(tags: &AllTags) -> Self {
         let mut encoder = Encoder::new();
 
-        encoder
-            .append_packet(tags)
-            .expect("Failed to encode tags");
+        encoder.append_packet(tags).expect("Failed to encode tags");
 
         Self {
-            encoded: encoder.take().to_vec()
+            encoded: encoder.take().to_vec(),
         }
     }
 }
