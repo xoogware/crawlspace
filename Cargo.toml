@@ -32,6 +32,7 @@ clap = { version = "4.5.20", features = ["derive", "env"] }
 color-eyre = "0.6.3"
 fastanvil = { git = "https://github.com/owengage/fastnbt.git" }
 fastnbt = { git = "https://github.com/owengage/fastnbt.git" }
+flate2 = { version = "1.0.35", default-features = false, features = ["zlib-ng"] }
 rand = "0.8.5"
 rayon = "1.10.0"
 serde = { version = "1.0.213", features = ["derive"] }

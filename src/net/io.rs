@@ -30,7 +30,7 @@ use tokio::{
     sync::{Mutex, RwLock},
 };
 
-use crate::protocol::{self, ClientboundPacket, Frame, ServerboundPacket};
+use crate::protocol::{self, datatypes::VarInt, ClientboundPacket, Frame, ServerboundPacket};
 
 #[derive(Debug)]
 pub struct NetIo {
