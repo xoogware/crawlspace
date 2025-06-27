@@ -18,10 +18,15 @@
  */
 
 use byteorder::{BigEndian, ReadBytesExt};
+use crawlspace_macro::Packet;
 
-use crate::protocol::{datatypes::{Position, VarInt}, Decode, Packet, PacketDirection, PacketState};
+use crate::protocol::{
+    datatypes::{Position, VarInt},
+    Decode, Packet, PacketDirection, PacketState,
+};
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(id = "minecraft:use_item_on", serverbound, state = "PacketState::Play")]
 pub struct UseItemOnS {
     pub hand: Hand,
     pub location: Position,
@@ -88,12 +93,6 @@ impl TryFrom<VarInt> for Face {
             i => Err(FaceParseError::Unexpected(i)),
         }
     }
-}
-
-impl Packet for UseItemOnS {
-    const ID: &'static str = "minecraft:use_item_on";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl Decode<'_> for UseItemOnS {

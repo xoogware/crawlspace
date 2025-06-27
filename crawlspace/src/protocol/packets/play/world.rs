@@ -21,8 +21,10 @@ use std::collections::HashMap;
 
 use bit_vec::BitVec;
 use bytes::BufMut;
+use crawlspace_macro::Packet;
 use fastnbt::SerOpts;
 
+use crate::protocol::{PacketDirection, PacketState};
 use crate::{
     protocol::{
         datatypes::{VarInt, VarLong},
@@ -34,18 +36,16 @@ use crate::{
     },
     CrawlState,
 };
-use crate::protocol::{PacketDirection, PacketState};
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:set_chunk_cache_center",
+    clientbound,
+    state = "PacketState::Play"
+)]
 pub struct SetCenterChunkC {
     pub x: VarInt,
     pub y: VarInt,
-}
-
-impl Packet for SetCenterChunkC {
-    const ID: &'static str = "minecraft:set_chunk_cache_center";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for SetCenterChunkC {
@@ -56,7 +56,12 @@ impl Encode for SetCenterChunkC {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:level_chunk_with_light",
+    clientbound,
+    state = "PacketState::Play"
+)]
 pub struct ChunkDataUpdateLightC<'a> {
     x: i32,
     z: i32,
@@ -212,12 +217,6 @@ impl Encode for PalettedContainer {
 
         Ok(())
     }
-}
-
-impl Packet for ChunkDataUpdateLightC<'_> {
-    const ID: &'static str = "minecraft:level_chunk_with_light";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for ChunkDataUpdateLightC<'_> {
@@ -446,7 +445,12 @@ impl ChunkDataUpdateLightC<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:initialize_border",
+    clientbound,
+    state = "PacketState::Play"
+)]
 pub struct InitializeWorldBorderC {
     pub x: f64,
     pub z: f64,
@@ -456,12 +460,6 @@ pub struct InitializeWorldBorderC {
     pub teleport_boundary: i32,
     pub warning_blocks: i32,
     pub warning_time_sec: i32,
-}
-
-impl Packet for InitializeWorldBorderC {
-    const ID: &'static str = "minecraft:initialize_border";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for InitializeWorldBorderC {
@@ -478,16 +476,15 @@ impl Encode for InitializeWorldBorderC {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:set_border_center",
+    clientbound,
+    state = "PacketState::Play"
+)]
 pub struct SetBorderCenterC {
     pub x: f64,
     pub z: f64,
-}
-
-impl Packet for SetBorderCenterC {
-    const ID: &'static str = "minecraft:set_border_center";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for SetBorderCenterC {
@@ -498,14 +495,13 @@ impl Encode for SetBorderCenterC {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:set_border_size",
+    clientbound,
+    state = "PacketState::Play"
+)]
 pub struct SetBorderSizeC(pub f64);
-
-impl Packet for SetBorderSizeC {
-    const ID: &'static str = "minecraft:set_border_size";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
-}
 
 impl Encode for SetBorderSizeC {
     fn encode(&self, w: impl std::io::Write) -> color_eyre::eyre::Result<()> {

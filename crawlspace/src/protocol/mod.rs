@@ -248,19 +248,19 @@ impl TryFrom<i32> for ProtocolState {
 }
 
 pub trait Packet {
-    const ID: &'static str;
-    const STATE: PacketState;
-    const DIRECTION: PacketDirection;
+    fn id() -> &'static str;
+    fn state() -> PacketState;
+    fn direction() -> PacketDirection;
 
     fn get_id() -> i32 {
         PACKETS
-            .get_protocol_id(Self::STATE, Self::DIRECTION, Self::ID)
+            .get_protocol_id(Self::state(), Self::direction(), Self::id())
             .unwrap_or_else(|| {
                 panic!(
                     "expected packet {:?}/{} ({:?}) to exist",
-                    Self::STATE,
-                    Self::ID,
-                    Self::DIRECTION
+                    Self::state(),
+                    Self::id(),
+                    Self::direction()
                 )
             })
     }

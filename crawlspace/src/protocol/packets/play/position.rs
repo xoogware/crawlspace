@@ -18,21 +18,21 @@
  */
 
 use byteorder::{BigEndian, ReadBytesExt};
+use crawlspace_macro::Packet;
 
 use crate::protocol::{Decode, Packet, PacketDirection, PacketState};
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:move_player_pos",
+    serverbound,
+    state = "PacketState::Play"
+)]
 pub struct SetPlayerPositionS {
     pub x: f64,
     pub feet_y: f64,
     pub z: f64,
     pub on_ground: bool,
-}
-
-impl Packet for SetPlayerPositionS {
-    const ID: &'static str = "minecraft:move_player_pos";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl Decode<'_> for SetPlayerPositionS {
@@ -49,7 +49,12 @@ impl Decode<'_> for SetPlayerPositionS {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:move_player_pos_rot",
+    serverbound,
+    state = "PacketState::Play"
+)]
 pub struct SetPlayerPositionAndRotationS {
     pub x: f64,
     pub feet_y: f64,
@@ -57,12 +62,6 @@ pub struct SetPlayerPositionAndRotationS {
     pub yaw: f32,
     pub pitch: f32,
     pub on_ground: bool,
-}
-
-impl Packet for SetPlayerPositionAndRotationS {
-    const ID: &'static str = "minecraft:move_player_pos_rot";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl Decode<'_> for SetPlayerPositionAndRotationS {

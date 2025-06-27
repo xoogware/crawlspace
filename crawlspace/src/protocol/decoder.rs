@@ -61,7 +61,7 @@ impl Frame {
         ensure!(
             r.is_empty(),
             "Didn't decode enough bytes decoding {}: {} left",
-            P::ID,
+            P::id(),
             r.len()
         );
 

@@ -1,18 +1,19 @@
-use std::collections::HashMap;
-use crate::protocol::{Encode, Packet, PacketDirection, PacketState};
-use crate::protocol::datatypes::{Bounded, VarInt};
+use crawlspace_macro::Packet;
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+use crate::protocol::datatypes::{Bounded, VarInt};
+use crate::protocol::{Encode, Packet, PacketDirection, PacketState};
+use std::collections::HashMap;
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Packet)]
+#[packet(
+    id = "minecraft:update_tags",
+    clientbound,
+    state = "PacketState::Configuration"
+)]
 pub struct AllTags(pub HashMap<String, Tags>);
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Tags(pub HashMap<String, Vec<String>>);
-
-impl Packet for AllTags {
-    const ID: &'static str = "minecraft:update_tags";
-    const STATE: PacketState = PacketState::Configuration;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
-}
 
 impl Encode for AllTags {
     fn encode(&self, mut w: impl std::io::Write) -> color_eyre::Result<()> {

@@ -544,7 +544,7 @@ impl SharedPlayer {
             .as_str();
 
         match resource {
-            SetPlayerPositionS::ID => {
+            id if id == SetPlayerPositionS::id() => {
                 let packet: SetPlayerPositionS = frame.decode()?;
 
                 let tp_state = self.0.tp_state.read().await;
@@ -554,7 +554,7 @@ impl SharedPlayer {
                 }
             }
 
-            SetPlayerPositionAndRotationS::ID => {
+            id if id == SetPlayerPositionAndRotationS::id() => {
                 let packet: SetPlayerPositionAndRotationS = frame.decode()?;
 
                 let tp_state = self.0.tp_state.read().await;
@@ -565,12 +565,12 @@ impl SharedPlayer {
                 }
             }
 
-            ConfirmTeleportS::ID => {
+            id if id == ConfirmTeleportS::id() => {
                 let packet: ConfirmTeleportS = frame.decode()?;
                 self.check_teleports(Some(packet)).await?;
             }
 
-            UseItemOnS::ID => {
+            id if id == UseItemOnS::id() => {
                 let packet: UseItemOnS = frame.decode()?;
                 self.handle_use_item(packet).await?;
             }

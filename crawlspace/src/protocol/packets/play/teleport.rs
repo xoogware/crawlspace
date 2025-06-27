@@ -19,11 +19,18 @@
 
 use std::sync::atomic::{AtomicI32, Ordering};
 
+use crawlspace_macro::Packet;
+
 use crate::protocol::{datatypes::VarInt, Decode, Encode, Packet, PacketDirection, PacketState};
 
 static TP_ID: AtomicI32 = AtomicI32::new(0);
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:player_position",
+    clientbound,
+    state = "PacketState::Play"
+)]
 pub struct SynchronisePositionC {
     x: f64,
     y: f64,
@@ -123,12 +130,6 @@ impl SynchronisePositionC {
     }
 }
 
-impl Packet for SynchronisePositionC {
-    const ID: &'static str = "minecraft:player_position";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
-}
-
 impl Encode for SynchronisePositionC {
     fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
         VarInt(self.id).encode(&mut w)?;
@@ -146,15 +147,14 @@ impl Encode for SynchronisePositionC {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:accept_teleportation",
+    serverbound,
+    state = "PacketState::Play"
+)]
 pub struct ConfirmTeleportS {
     pub id: i32,
-}
-
-impl Packet for ConfirmTeleportS {
-    const ID: &'static str = "minecraft:accept_teleportation";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl Decode<'_> for ConfirmTeleportS {

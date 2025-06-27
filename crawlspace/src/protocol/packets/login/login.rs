@@ -18,20 +18,19 @@
  */
 
 use color_eyre::eyre::Result;
+use crawlspace_macro::Packet;
 use uuid::Uuid;
 
-use crate::protocol::{datatypes::{Bounded, Bytes, Rest, VarInt}, Decode, Encode, Packet, PacketDirection, PacketState, Property};
+use crate::protocol::{
+    datatypes::{Bounded, Bytes, Rest, VarInt},
+    Decode, Encode, Packet, PacketDirection, PacketState, Property,
+};
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(id = "minecraft:hello", serverbound, state = "PacketState::Login")]
 pub struct LoginStartS<'a> {
     pub name: Bounded<&'a str, 16>,
     pub player_uuid: Uuid,
-}
-
-impl Packet for LoginStartS<'_> {
-    const ID: &'static str = "minecraft:hello";
-    const STATE: PacketState = PacketState::Login;
-    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl<'a> Decode<'a> for LoginStartS<'a> {
@@ -43,17 +42,16 @@ impl<'a> Decode<'a> for LoginStartS<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:login_finished",
+    clientbound,
+    state = "PacketState::Login"
+)]
 pub struct LoginSuccessC<'a> {
     pub uuid: Uuid,
     pub username: Bounded<&'a str, 16>,
     pub properties: Vec<Property<'a>>,
-}
-
-impl Packet for LoginSuccessC<'_> {
-    const ID: &'static str = "minecraft:login_finished";
-    const STATE: PacketState = PacketState::Login;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl<'a> Encode for LoginSuccessC<'a> {
@@ -69,17 +67,16 @@ impl<'a> Encode for LoginSuccessC<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:custom_query",
+    clientbound,
+    state = "PacketState::Login"
+)]
 pub struct PluginRequestC<'a> {
     pub message_id: VarInt,
     pub channel: Bounded<&'a str, 32767>,
     pub data: Rest<Bytes<'a>, 1048576>,
-}
-
-impl Packet for PluginRequestC<'_> {
-    const ID: &'static str = "minecraft:custom_query";
-    const STATE: PacketState = PacketState::Login;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl<'a> Encode for PluginRequestC<'a> {
@@ -92,35 +89,37 @@ impl<'a> Encode for PluginRequestC<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:custom_query_answer",
+    serverbound,
+    state = "PacketState::Login"
+)]
 pub struct PluginResponseS<'a> {
     pub message_id: VarInt,
-    pub data: Option<Rest<Bytes<'a>, 1048576>>
-}
-
-impl Packet for PluginResponseS<'_> {
-    const ID: &'static str = "minecraft:custom_query_answer";
-    const STATE: PacketState = PacketState::Login;
-    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
+    pub data: Option<Rest<Bytes<'a>, 1048576>>,
 }
 
 impl<'a> Decode<'a> for PluginResponseS<'a> {
     fn decode(r: &mut &'a [u8]) -> Result<Self> {
         Ok(Self {
             message_id: VarInt::decode(r)?,
-            data: if bool::decode(r)? { Some(Rest::<Bytes<'a>, 1048576>::decode(r)?) } else { None }
+            data: if bool::decode(r)? {
+                Some(Rest::<Bytes<'a>, 1048576>::decode(r)?)
+            } else {
+                None
+            },
         })
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:login_acknowledged",
+    serverbound,
+    state = "PacketState::Login"
+)]
 pub struct LoginAckS;
-
-impl Packet for LoginAckS {
-    const ID: &'static str = "minecraft:login_acknowledged";
-    const STATE: PacketState = PacketState::Login;
-    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
-}
 
 impl Decode<'_> for LoginAckS {
     fn decode(_r: &mut &'_ [u8]) -> Result<Self> {

@@ -17,16 +17,13 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use crawlspace_macro::Packet;
+
 use crate::protocol::{Decode, Encode, Packet, PacketDirection, PacketState};
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(id = "minecraft:keep_alive", clientbound, state = "PacketState::Play")]
 pub struct KeepAliveC(pub i64);
-
-impl Packet for KeepAliveC {
-    const ID: &'static str = "minecraft:keep_alive";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
-}
 
 impl Encode for KeepAliveC {
     fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
@@ -34,15 +31,10 @@ impl Encode for KeepAliveC {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(id = "minecraft:keep_alive", serverbound, state = "PacketState::Play")]
 #[expect(unused)]
 pub struct KeepAliveS(i64);
-
-impl Packet for KeepAliveS {
-    const ID: &'static str = "minecraft:keep_alive";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
-}
 
 impl<'a> Decode<'a> for KeepAliveS {
     fn decode(r: &mut &'a [u8]) -> color_eyre::eyre::Result<Self> {

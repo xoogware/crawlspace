@@ -19,21 +19,24 @@
 
 use byteorder::{BigEndian, ReadBytesExt};
 use color_eyre::eyre::Result;
+use crawlspace_macro::Packet;
 
-use crate::protocol::{datatypes::{Bounded, VarInt}, Decode, Packet, PacketDirection, PacketState, ProtocolState};
+use crate::protocol::{
+    datatypes::{Bounded, VarInt},
+    Decode, Packet, PacketDirection, PacketState, ProtocolState,
+};
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:intention",
+    serverbound,
+    state = "PacketState::Handshake"
+)]
 pub struct HandshakeS<'a> {
     pub protocol_version: VarInt,
     _server_address: Bounded<&'a str, 255>,
     _server_port: u16,
     pub next_state: ProtocolState,
-}
-
-impl Packet for HandshakeS<'_> {
-    const ID: &'static str = "minecraft:intention";
-    const STATE: PacketState = PacketState::Handshake;
-    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
 }
 
 impl<'a> Decode<'a> for HandshakeS<'a> {

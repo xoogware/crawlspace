@@ -17,9 +17,15 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use crate::protocol::{datatypes::{Bounded, Position, VarInt}, Encode, Packet, PacketDirection, PacketState};
+use crawlspace_macro::Packet;
 
-#[derive(Debug)]
+use crate::protocol::{
+    datatypes::{Bounded, Position, VarInt},
+    Encode, Packet, PacketDirection, PacketState,
+};
+
+#[derive(Debug, Packet)]
+#[packet(id = "minecraft:login", clientbound, state = "PacketState::Play")]
 pub struct LoginPlayC<'a> {
     /// The player's Entity ID (EID).
     pub entity_id: i32,
@@ -87,12 +93,6 @@ impl From<Gamemode> for i8 {
 pub struct DeathLocation<'a> {
     dimension_name: Bounded<&'a str>,
     death_location: Position,
-}
-
-impl Packet for LoginPlayC<'_> {
-    const ID: &'static str = "minecraft:login";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl<'a> Encode for LoginPlayC<'a> {

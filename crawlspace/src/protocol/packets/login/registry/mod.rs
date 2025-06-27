@@ -19,6 +19,7 @@
 
 use std::{collections::HashMap, sync::LazyLock};
 
+use crawlspace_macro::Packet;
 use fastnbt::SerOpts;
 use serde::{de, Deserialize, Serialize};
 
@@ -30,9 +31,9 @@ mod chat;
 mod damage;
 mod dimension;
 mod painting;
+mod tags;
 mod trim;
 mod wolf;
-mod tags;
 
 pub use banner::*;
 pub use biome::*;
@@ -40,9 +41,9 @@ pub use chat::*;
 pub use damage::*;
 pub use dimension::*;
 pub use painting::*;
+pub use tags::*;
 pub use trim::*;
 pub use wolf::*;
-pub use tags::*;
 
 pub static ALL_REGISTRIES: LazyLock<AllRegistries> = LazyLock::new(|| {
     serde_json::from_str(include_str!("../../../../../assets/registries.json"))
@@ -54,8 +55,16 @@ pub static TAGS: LazyLock<AllTags> = LazyLock::new(|| {
         .expect("tags.json should be parseable")
 });
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Registry<T: RegistryItem> {
+#[derive(Clone, Debug, Serialize, Deserialize, Packet)]
+#[packet(
+    id = "minecraft:registry_data",
+    clientbound,
+    state = "PacketState::Configuration"
+)]
+pub struct Registry<T>
+where
+    T: RegistryItem,
+{
     registry_id: String,
     pub entries: Vec<RegistryEntry<T>>,
 }
@@ -69,15 +78,6 @@ impl<T: RegistryItem> Registry<T> {
             .try_into()
             .unwrap()
     }
-}
-
-impl<T> Packet for Registry<T>
-where
-    T: RegistryItem,
-{
-    const ID: &'static str = "minecraft:registry_data";
-    const STATE: PacketState = PacketState::Configuration;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -17,18 +17,19 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use crawlspace_macro::Packet;
+
 use crate::protocol::{datatypes::VarInt, Encode, Packet, PacketDirection, PacketState};
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:ticking_state",
+    clientbound,
+    state = "PacketState::Play"
+)]
 pub struct SetTickingStateC {
     pub tick_rate: f32,
     pub is_frozen: bool,
-}
-
-impl Packet for SetTickingStateC {
-    const ID: &'static str = "minecraft:ticking_state";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for SetTickingStateC {
@@ -39,14 +40,13 @@ impl Encode for SetTickingStateC {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:ticking_step",
+    clientbound,
+    state = "PacketState::Play"
+)]
 pub struct StepTicksC(pub i32);
-
-impl Packet for StepTicksC {
-    const ID: &'static str = "minecraft:ticking_step";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
-}
 
 impl Encode for StepTicksC {
     fn encode(&self, w: impl std::io::Write) -> color_eyre::eyre::Result<()> {

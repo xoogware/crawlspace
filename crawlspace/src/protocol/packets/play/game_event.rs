@@ -17,20 +17,17 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use crawlspace_macro::Packet;
+
 use crate::protocol::{Encode, Packet, PacketDirection, PacketState};
 
 use super::Gamemode;
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(id = "minecraft:game_event", clientbound, state = "PacketState::Play")]
 pub struct GameEventC {
     event: u8,
     value: f32,
-}
-
-impl Packet for GameEventC {
-    const ID: &'static str = "minecraft:game_event";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for GameEventC {

@@ -21,17 +21,17 @@ use std::io::Write;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use color_eyre::eyre::Result;
+use crawlspace_macro::Packet;
 
 use crate::protocol::{Decode, Encode, Packet, PacketDirection, PacketState};
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:status_request",
+    serverbound,
+    state = "PacketState::Status"
+)]
 pub struct StatusRequestS;
-
-impl Packet for StatusRequestS {
-    const ID: &'static str = "minecraft:status_request";
-    const STATE: PacketState = PacketState::Status;
-    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
-}
 
 impl<'a> Decode<'a> for StatusRequestS {
     fn decode(_buf: &mut &'a [u8]) -> Result<Self> {
@@ -39,15 +39,14 @@ impl<'a> Decode<'a> for StatusRequestS {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:status_response",
+    clientbound,
+    state = "PacketState::Status"
+)]
 pub struct StatusResponseC<'a> {
     pub json_respose: &'a str,
-}
-
-impl<'a> Packet for StatusResponseC<'a> {
-    const ID: &'static str = "minecraft:status_response";
-    const STATE: PacketState = PacketState::Status;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl<'a> Encode for StatusResponseC<'a> {
@@ -56,26 +55,16 @@ impl<'a> Encode for StatusResponseC<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(id = "minecraft:ping", serverbound, state = "PacketState::Status")]
 pub struct PingC {
     pub payload: i64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(id = "minecraft:pong", clientbound, state = "PacketState::Status")]
 pub struct PingS {
     pub payload: i64,
-}
-
-impl Packet for PingC {
-    const ID: &'static str = "minecraft:ping";
-    const STATE: PacketState = PacketState::Status;
-    const DIRECTION: PacketDirection = PacketDirection::Serverbound;
-}
-
-impl Packet for PingS {
-    const ID: &'static str = "minecraft:pong";
-    const STATE: PacketState = PacketState::Status;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for PingC {

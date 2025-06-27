@@ -17,13 +17,22 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use crawlspace_macro::Packet;
 use uuid::Uuid;
 
-use crate::protocol::{datatypes::{Bounded, VarInt}, Encode, Packet, PacketDirection, PacketState, Property};
+use crate::protocol::{
+    datatypes::{Bounded, VarInt},
+    Encode, Packet, PacketDirection, PacketState, Property,
+};
 
 use super::Gamemode;
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:player_info_update",
+    clientbound,
+    state = "PacketState::Play"
+)]
 pub struct PlayerInfoUpdateC<'a> {
     pub players: &'a [PlayerStatus<'a>],
 }
@@ -49,12 +58,6 @@ enum PlayerAction<'a> {
     UpdateLatency {
         latency: VarInt,
     },
-}
-
-impl Packet for PlayerInfoUpdateC<'_> {
-    const ID: &'static str = "minecraft:player_info_update";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 // "I'm a Never-Nester"

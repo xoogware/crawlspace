@@ -17,6 +17,9 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+use crawlspace_macro::Packet;
+
+use crate::protocol::{PacketDirection, PacketState};
 use crate::{
     protocol::{
         datatypes::{Slot, TextComponent, VarInt},
@@ -24,19 +27,13 @@ use crate::{
     },
     server::window::{Window, WindowType},
 };
-use crate::protocol::{PacketDirection, PacketState};
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(id = "minecraft:open_screen", clientbound, state = "PacketState::Play")]
 pub struct OpenScreenC {
     window_id: i32,
     window_type: WindowType,
     window_title: TextComponent,
-}
-
-impl Packet for OpenScreenC {
-    const ID: &'static str = "minecraft:open_screen";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for OpenScreenC {
@@ -60,18 +57,17 @@ impl From<&Window> for OpenScreenC {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Packet)]
+#[packet(
+    id = "minecraft:container_set_content",
+    clientbound,
+    state = "PacketState::Play"
+)]
 pub struct SetContainerContentC {
     pub window_id: u8,
     pub state_id: i32,
     pub slot_data: Vec<Slot>,
     pub carried_item: Slot,
-}
-
-impl Packet for SetContainerContentC {
-    const ID: &'static str = "minecraft:container_set_content";
-    const STATE: PacketState = PacketState::Play;
-    const DIRECTION: PacketDirection = PacketDirection::Clientbound;
 }
 
 impl Encode for SetContainerContentC {
