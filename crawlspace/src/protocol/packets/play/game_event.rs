@@ -17,25 +17,17 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use crawlspace_macro::Packet;
+use crawlspace_macro::{Encode, Packet};
 
 use crate::protocol::{Encode, Packet, PacketDirection, PacketState};
 
 use super::Gamemode;
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Encode)]
 #[packet(id = "minecraft:game_event", clientbound, state = "PacketState::Play")]
 pub struct GameEventC {
     event: u8,
     value: f32,
-}
-
-impl Encode for GameEventC {
-    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
-        self.event.encode(&mut w)?;
-        self.value.encode(&mut w)?;
-        Ok(())
-    }
 }
 
 #[derive(Debug)]

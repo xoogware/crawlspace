@@ -18,14 +18,14 @@
  */
 
 use color_eyre::eyre::{ensure, Result};
-use crawlspace_macro::Packet;
+use crawlspace_macro::{Encode, Packet};
 
 use crate::protocol::{
     datatypes::{Bounded, VarInt},
     Decode, DecodeSized, Encode, Packet, PacketDirection, PacketState,
 };
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Encode)]
 #[packet(
     id = "minecraft:select_known_packs",
     clientbound,
@@ -36,30 +36,11 @@ pub struct KnownPacksC<'a> {
     known_packs: Vec<KnownPack<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Encode)]
 pub struct KnownPack<'a> {
     namespace: Bounded<&'a str>,
     id: Bounded<&'a str>,
     version: Bounded<&'a str>,
-}
-
-impl Encode for KnownPacksC<'_> {
-    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
-        self.known_pack_count.encode(&mut w)?;
-        self.known_packs.encode(&mut w)?;
-
-        Ok(())
-    }
-}
-
-impl Encode for KnownPack<'_> {
-    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
-        self.namespace.encode(&mut w)?;
-        self.id.encode(&mut w)?;
-        self.version.encode(&mut w)?;
-
-        Ok(())
-    }
 }
 
 impl<'a> KnownPacksC<'a> {
@@ -115,19 +96,13 @@ impl<'a> Decode<'a> for KnownPack<'a> {
     }
 }
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Encode)]
 #[packet(
     id = "minecraft:finish_configuration",
     clientbound,
     state = "PacketState::Configuration"
 )]
 pub struct FinishConfigurationC;
-
-impl Encode for FinishConfigurationC {
-    fn encode(&self, _w: impl std::io::Write) -> Result<()> {
-        Ok(())
-    }
-}
 
 #[derive(Debug, Packet)]
 #[packet(

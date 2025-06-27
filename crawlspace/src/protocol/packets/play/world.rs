@@ -21,7 +21,7 @@ use std::collections::HashMap;
 
 use bit_vec::BitVec;
 use bytes::BufMut;
-use crawlspace_macro::Packet;
+use crawlspace_macro::{Encode, Packet};
 use fastnbt::SerOpts;
 
 use crate::protocol::{PacketDirection, PacketState};
@@ -37,7 +37,7 @@ use crate::{
     CrawlState,
 };
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Encode)]
 #[packet(
     id = "minecraft:set_chunk_cache_center",
     clientbound,
@@ -46,14 +46,6 @@ use crate::{
 pub struct SetCenterChunkC {
     pub x: VarInt,
     pub y: VarInt,
-}
-
-impl Encode for SetCenterChunkC {
-    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
-        self.x.encode(&mut w)?;
-        self.y.encode(&mut w)?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Packet)]
@@ -77,23 +69,12 @@ pub struct ChunkDataUpdateLightC<'a> {
     block_light_arrays: Vec<&'a [u8]>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Encode)]
 struct BlockEntity {
     packed_xz: u8,
     y: i16,
     kind: VarInt,
     data: Vec<u8>,
-}
-
-impl Encode for BlockEntity {
-    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
-        self.packed_xz.encode(&mut w)?;
-        self.y.encode(&mut w)?;
-        self.kind.encode(&mut w)?;
-        self.data.encode(&mut w)?;
-
-        Ok(())
-    }
 }
 
 impl From<world::BlockEntity> for BlockEntity {
@@ -161,21 +142,11 @@ impl From<world::BlockEntity> for BlockEntity {
 #[derive(Debug)]
 struct HeightMaps(HashMap<String, fastnbt::LongArray>);
 
-#[derive(Debug)]
+#[derive(Debug, Encode)]
 struct ChunkSection {
     block_count: i16,
     block_states: PalettedContainer,
     biomes: PalettedContainer,
-}
-
-impl Encode for ChunkSection {
-    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
-        self.block_count.encode(&mut w)?;
-        self.block_states.encode(&mut w)?;
-        self.biomes.encode(&mut w)?;
-
-        Ok(())
-    }
 }
 
 #[derive(Debug)]
@@ -445,7 +416,7 @@ impl ChunkDataUpdateLightC<'_> {
     }
 }
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Encode)]
 #[packet(
     id = "minecraft:initialize_border",
     clientbound,
@@ -456,27 +427,17 @@ pub struct InitializeWorldBorderC {
     pub z: f64,
     pub old_diameter: f64,
     pub new_diameter: f64,
+    #[varlong]
     pub speed: i64,
+    #[varint]
     pub teleport_boundary: i32,
+    #[varint]
     pub warning_blocks: i32,
+    #[varint]
     pub warning_time_sec: i32,
 }
 
-impl Encode for InitializeWorldBorderC {
-    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
-        self.x.encode(&mut w)?;
-        self.z.encode(&mut w)?;
-        self.old_diameter.encode(&mut w)?;
-        self.new_diameter.encode(&mut w)?;
-        VarLong(self.speed).encode(&mut w)?;
-        VarInt(self.teleport_boundary).encode(&mut w)?;
-        VarInt(self.warning_blocks).encode(&mut w)?;
-        VarInt(self.warning_time_sec).encode(&mut w)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Encode)]
 #[packet(
     id = "minecraft:set_border_center",
     clientbound,
@@ -487,24 +448,10 @@ pub struct SetBorderCenterC {
     pub z: f64,
 }
 
-impl Encode for SetBorderCenterC {
-    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
-        self.x.encode(&mut w)?;
-        self.z.encode(&mut w)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Encode)]
 #[packet(
     id = "minecraft:set_border_size",
     clientbound,
     state = "PacketState::Play"
 )]
 pub struct SetBorderSizeC(pub f64);
-
-impl Encode for SetBorderSizeC {
-    fn encode(&self, w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
-        self.0.encode(w)
-    }
-}

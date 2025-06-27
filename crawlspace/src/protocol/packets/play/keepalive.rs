@@ -17,19 +17,13 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use crawlspace_macro::Packet;
+use crawlspace_macro::{Encode, Packet};
 
 use crate::protocol::{Decode, Encode, Packet, PacketDirection, PacketState};
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Encode)]
 #[packet(id = "minecraft:keep_alive", clientbound, state = "PacketState::Play")]
 pub struct KeepAliveC(pub i64);
-
-impl Encode for KeepAliveC {
-    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
-        self.0.encode(&mut w)
-    }
-}
 
 #[derive(Debug, Packet)]
 #[packet(id = "minecraft:keep_alive", serverbound, state = "PacketState::Play")]

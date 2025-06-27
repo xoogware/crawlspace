@@ -1,6 +1,6 @@
 use proc_macro::{Span, TokenStream};
-use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Ident, Lit};
+use quote::{quote, TokenStreamExt};
+use syn::{parse_macro_input, DeriveInput, Fields, Ident, Index, Lit};
 
 #[proc_macro_derive(Packet, attributes(packet))]
 pub fn derive_packet(input: TokenStream) -> TokenStream {
@@ -92,6 +92,93 @@ pub fn derive_packet(input: TokenStream) -> TokenStream {
             PacketDirection::#direction
         }
     }
+    }
+    .into()
+}
+
+/// Automatically implements "straight-across" encoding for the given struct, i.e. fields are
+/// serialized in order as is. Supports #[varint] and #[varlong] attributes on integer types to
+/// serialize as those formats instead.
+#[proc_macro_derive(Encode, attributes(varint, varlong))]
+pub fn derive_encode(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    let syn::Data::Struct(data) = input.data else {
+        panic!("Can only derive Encode on a struct");
+    };
+
+    let name = input.ident;
+    let where_clause = input.generics.where_clause.clone();
+    let generics = input.generics;
+
+    let mut fields_encoded = proc_macro2::TokenStream::new();
+
+    match data.fields {
+        Fields::Named(fields) => {
+            for field in fields.named {
+                let field_name = field.ident.unwrap();
+
+                if field
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.meta.path().is_ident("varint"))
+                {
+                    fields_encoded.extend(quote! {
+                        VarInt(self.#field_name as i32).encode(&mut w)?;
+                    });
+                } else if field
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.meta.path().is_ident("varlong"))
+                {
+                    fields_encoded.extend(quote! {
+                        VarLong(self.#field_name as i64).encode(&mut w)?;
+                    });
+                } else {
+                    fields_encoded.extend(quote! {
+                        self.#field_name.encode(&mut w)?;
+                    });
+                }
+            }
+        }
+        Fields::Unnamed(fields) => {
+            for (i, field) in fields.unnamed.iter().enumerate() {
+                let i = Index::from(i);
+
+                if field
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.meta.path().is_ident("varint"))
+                {
+                    fields_encoded.extend(quote! {
+                        VarInt(self.#i as i32).encode(&mut w)?;
+                    });
+                } else if field
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.meta.path().is_ident("varlong"))
+                {
+                    fields_encoded.extend(quote! {
+                        VarLong(self.#i as i64).encode(&mut w)?;
+                    });
+                } else {
+                    fields_encoded.extend(quote! {
+                        self.#i.encode(&mut w)?;
+                    });
+                }
+            }
+        }
+        Fields::Unit => (),
+    }
+
+    quote! {
+        impl #generics Encode for #name #generics #where_clause {
+            fn encode(&self, mut w: impl std::io::Write) -> color_eyre::Result<()> {
+                #fields_encoded
+
+                Ok(())
+            }
+        }
     }
     .into()
 }

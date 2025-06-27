@@ -19,19 +19,21 @@
 
 use std::sync::atomic::{AtomicI32, Ordering};
 
-use crawlspace_macro::Packet;
+use crawlspace_macro::{Encode, Packet};
 
 use crate::protocol::{datatypes::VarInt, Decode, Encode, Packet, PacketDirection, PacketState};
 
 static TP_ID: AtomicI32 = AtomicI32::new(0);
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Encode)]
 #[packet(
     id = "minecraft:player_position",
     clientbound,
     state = "PacketState::Play"
 )]
 pub struct SynchronisePositionC {
+    #[varint]
+    pub id: i32,
     x: f64,
     y: f64,
     z: f64,
@@ -41,7 +43,6 @@ pub struct SynchronisePositionC {
     yaw: f32,
     pitch: f32,
     flags: i32,
-    pub id: i32,
 }
 
 #[allow(unused)]
@@ -127,23 +128,6 @@ impl SynchronisePositionC {
     pub const fn rotate_velocity(mut self) -> Self {
         self.flags |= flags::ROTATE_VEL;
         self
-    }
-}
-
-impl Encode for SynchronisePositionC {
-    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
-        VarInt(self.id).encode(&mut w)?;
-        self.x.encode(&mut w)?;
-        self.y.encode(&mut w)?;
-        self.z.encode(&mut w)?;
-        self.velocity_x.encode(&mut w)?;
-        self.velocity_y.encode(&mut w)?;
-        self.velocity_z.encode(&mut w)?;
-        self.yaw.encode(&mut w)?;
-        self.pitch.encode(&mut w)?;
-        self.flags.encode(&mut w)?;
-
-        Ok(())
     }
 }
 
