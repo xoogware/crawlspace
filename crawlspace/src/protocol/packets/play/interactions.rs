@@ -18,18 +18,20 @@
  */
 
 use byteorder::{BigEndian, ReadBytesExt};
-use crawlspace_macro::Packet;
+use crawlspace_macro::{Decode, Packet};
 
 use crate::protocol::{
     datatypes::{Position, VarInt},
     Decode, Packet, PacketDirection, PacketState,
 };
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Decode)]
 #[packet(id = "minecraft:use_item_on", serverbound, state = "PacketState::Play")]
 pub struct UseItemOnS {
+    #[varint]
     pub hand: Hand,
     pub location: Position,
+    #[varint]
     pub face: Face,
     pub cursor_x: f32,
     pub cursor_y: f32,
@@ -92,24 +94,5 @@ impl TryFrom<VarInt> for Face {
             5 => Ok(Face::West),
             i => Err(FaceParseError::Unexpected(i)),
         }
-    }
-}
-
-impl Decode<'_> for UseItemOnS {
-    fn decode(r: &mut &'_ [u8]) -> color_eyre::eyre::Result<Self>
-    where
-        Self: Sized,
-    {
-        Ok(Self {
-            hand: VarInt::decode(r)?.try_into()?,
-            location: Position::decode(r)?,
-            face: VarInt::decode(r)?.try_into()?,
-            cursor_x: r.read_f32::<BigEndian>()?,
-            cursor_y: r.read_f32::<BigEndian>()?,
-            cursor_z: r.read_f32::<BigEndian>()?,
-            inside_block: r.read_u8()? == 1,
-            world_border_hit: r.read_u8()? == 1,
-            sequence: VarInt::decode(r)?,
-        })
     }
 }

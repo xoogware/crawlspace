@@ -17,7 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use crawlspace_macro::{Encode, Packet};
+use crawlspace_macro::{Decode, Encode, Packet};
 
 use crate::protocol::{Decode, Encode, Packet, PacketDirection, PacketState};
 
@@ -25,13 +25,7 @@ use crate::protocol::{Decode, Encode, Packet, PacketDirection, PacketState};
 #[packet(id = "minecraft:keep_alive", clientbound, state = "PacketState::Play")]
 pub struct KeepAliveC(pub i64);
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Decode)]
 #[packet(id = "minecraft:keep_alive", serverbound, state = "PacketState::Play")]
 #[expect(unused)]
 pub struct KeepAliveS(i64);
-
-impl<'a> Decode<'a> for KeepAliveS {
-    fn decode(r: &mut &'a [u8]) -> color_eyre::eyre::Result<Self> {
-        Ok(Self(i64::decode(r)?))
-    }
-}

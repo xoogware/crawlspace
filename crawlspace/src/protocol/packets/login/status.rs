@@ -19,25 +19,19 @@
 
 use std::io::Write;
 
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, WriteBytesExt};
 use color_eyre::eyre::Result;
-use crawlspace_macro::Packet;
+use crawlspace_macro::{Decode, Packet};
 
 use crate::protocol::{Decode, Encode, Packet, PacketDirection, PacketState};
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Decode)]
 #[packet(
     id = "minecraft:status_request",
     serverbound,
     state = "PacketState::Status"
 )]
 pub struct StatusRequestS;
-
-impl<'a> Decode<'a> for StatusRequestS {
-    fn decode(_buf: &mut &'a [u8]) -> Result<Self> {
-        Ok(Self)
-    }
-}
 
 #[derive(Debug, Packet)]
 #[packet(
@@ -61,7 +55,7 @@ pub struct PingC {
     pub payload: i64,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Decode)]
 #[packet(id = "minecraft:pong", clientbound, state = "PacketState::Status")]
 pub struct PingS {
     pub payload: i64,
@@ -70,13 +64,5 @@ pub struct PingS {
 impl Encode for PingC {
     fn encode(&self, mut w: impl Write) -> Result<()> {
         Ok(w.write_i64::<BigEndian>(self.payload)?)
-    }
-}
-
-impl<'a> Decode<'a> for PingS {
-    fn decode(buf: &mut &'a [u8]) -> Result<Self> {
-        Ok(Self {
-            payload: buf.read_i64::<BigEndian>()?,
-        })
     }
 }

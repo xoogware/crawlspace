@@ -19,7 +19,7 @@
 
 use std::sync::atomic::{AtomicI32, Ordering};
 
-use crawlspace_macro::{Encode, Packet};
+use crawlspace_macro::{Decode, Encode, Packet};
 
 use crate::protocol::{datatypes::VarInt, Decode, Encode, Packet, PacketDirection, PacketState};
 
@@ -131,20 +131,13 @@ impl SynchronisePositionC {
     }
 }
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Decode)]
 #[packet(
     id = "minecraft:accept_teleportation",
     serverbound,
     state = "PacketState::Play"
 )]
 pub struct ConfirmTeleportS {
+    #[varint]
     pub id: i32,
-}
-
-impl Decode<'_> for ConfirmTeleportS {
-    fn decode(r: &mut &'_ [u8]) -> color_eyre::eyre::Result<Self> {
-        Ok(Self {
-            id: VarInt::decode(r)?.0,
-        })
-    }
 }

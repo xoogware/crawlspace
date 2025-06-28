@@ -17,16 +17,14 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use byteorder::{BigEndian, ReadBytesExt};
-use color_eyre::eyre::Result;
-use crawlspace_macro::Packet;
+use crawlspace_macro::{Decode, Packet};
 
 use crate::protocol::{
     datatypes::{Bounded, VarInt},
     Decode, Packet, PacketDirection, PacketState, ProtocolState,
 };
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Decode)]
 #[packet(
     id = "minecraft:intention",
     serverbound,
@@ -37,15 +35,4 @@ pub struct HandshakeS<'a> {
     _server_address: Bounded<&'a str, 255>,
     _server_port: u16,
     pub next_state: ProtocolState,
-}
-
-impl<'a> Decode<'a> for HandshakeS<'a> {
-    fn decode(buf: &mut &'a [u8]) -> Result<Self> {
-        Ok(Self {
-            protocol_version: VarInt::decode(buf)?,
-            _server_address: Bounded::<&'a str, 255>::decode(buf)?,
-            _server_port: buf.read_u16::<BigEndian>()?,
-            next_state: ProtocolState::try_from(VarInt::decode(buf)?.0)?,
-        })
-    }
 }

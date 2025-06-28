@@ -18,7 +18,7 @@
  */
 
 use color_eyre::eyre::Result;
-use crawlspace_macro::Packet;
+use crawlspace_macro::{Decode, Packet};
 use uuid::Uuid;
 
 use crate::protocol::{
@@ -26,20 +26,11 @@ use crate::protocol::{
     Decode, Encode, Packet, PacketDirection, PacketState, Property,
 };
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Decode)]
 #[packet(id = "minecraft:hello", serverbound, state = "PacketState::Login")]
 pub struct LoginStartS<'a> {
     pub name: Bounded<&'a str, 16>,
     pub player_uuid: Uuid,
-}
-
-impl<'a> Decode<'a> for LoginStartS<'a> {
-    fn decode(buf: &mut &'a [u8]) -> Result<Self> {
-        Ok(Self {
-            name: Bounded::<&'a str, 16>::decode(buf)?,
-            player_uuid: Uuid::decode(buf)?,
-        })
-    }
 }
 
 #[derive(Debug, Packet)]
@@ -113,16 +104,10 @@ impl<'a> Decode<'a> for PluginResponseS<'a> {
     }
 }
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Decode)]
 #[packet(
     id = "minecraft:login_acknowledged",
     serverbound,
     state = "PacketState::Login"
 )]
 pub struct LoginAckS;
-
-impl Decode<'_> for LoginAckS {
-    fn decode(_r: &mut &'_ [u8]) -> Result<Self> {
-        Ok(Self)
-    }
-}

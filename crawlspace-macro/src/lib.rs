@@ -1,6 +1,6 @@
 use proc_macro::{Span, TokenStream};
-use quote::{quote, TokenStreamExt};
-use syn::{parse_macro_input, DeriveInput, Fields, Ident, Index, Lit};
+use quote::quote;
+use syn::{parse_macro_input, parse_quote, DeriveInput, Fields, Ident, Index, Lit};
 
 #[proc_macro_derive(Packet, attributes(packet))]
 pub fn derive_packet(input: TokenStream) -> TokenStream {
@@ -177,6 +177,125 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
                 #fields_encoded
 
                 Ok(())
+            }
+        }
+    }
+    .into()
+}
+
+/// Automatically implements "straight-across" decoding for the given struct, i.e. fields are
+/// deserialized in order as is. Supports #[varint] and #[varlong] attributes on integer types to
+/// deserialize as those formats instead.
+#[proc_macro_derive(Decode, attributes(varint, varlong))]
+pub fn derive_decode(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    let syn::Data::Struct(data) = input.data else {
+        panic!("Can only derive Decode on a struct");
+    };
+
+    let name = input.ident;
+
+    let struct_tokens = match data.fields {
+        Fields::Named(fields) => {
+            let mut field_tokens = proc_macro2::TokenStream::new();
+
+            for field in fields.named {
+                let field_name = field.ident.expect("couldn't get ident for named field");
+                let ty = field.ty;
+
+                let wrapped = format!("for field {field_name} in {name}");
+
+                if field
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.meta.path().is_ident("varint"))
+                {
+                    field_tokens.extend(quote! {
+                        #field_name: VarInt::decode(r)
+                            .wrap_err(#wrapped)?
+                            .try_into()?,
+                    });
+                } else if field
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.meta.path().is_ident("varlong"))
+                {
+                    field_tokens.extend(quote! {
+                        #field_name: VarLong::decode(r)
+                            .wrap_err(#wrapped)?
+                            .try_into()?,
+                    });
+                } else {
+                    field_tokens.extend(quote! {
+                        #field_name: <#ty as Decode>::decode(r)
+                            .wrap_err(#wrapped)?,
+                    });
+                }
+            }
+            quote! {
+                Self {
+                    #field_tokens
+                }
+            }
+        }
+        Fields::Unnamed(fields) => {
+            let mut field_tokens = proc_macro2::TokenStream::new();
+            for (i, field) in fields.unnamed.into_iter().enumerate() {
+                let ty = field.ty;
+
+                let wrapped = format!("for field {i} in {name}");
+
+                if field
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.meta.path().is_ident("varint"))
+                {
+                    field_tokens.extend(quote! {
+                        VarInt::decode(r)
+                            .wrap_err(#wrapped)?
+                            .try_into()?,
+                    });
+                } else if field
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.meta.path().is_ident("varlong"))
+                {
+                    field_tokens.extend(quote! {
+                        VarLong::decode(r)
+                            .wrap_err(#wrapped)?
+                            .try_into()?,
+                    });
+                } else {
+                    field_tokens.extend(quote! {
+                        <#ty as Decode>::decode(r)
+                            .wrap_err(#wrapped)?,
+                    });
+                }
+            }
+            quote! {
+                Self(#field_tokens)
+            }
+        }
+        Fields::Unit => quote! { Self },
+    };
+
+    let struct_generics = input.generics;
+    let where_clause = struct_generics.where_clause.clone();
+
+    let mut impl_generics = struct_generics.clone();
+    if impl_generics.lifetimes().count() == 0 {
+        impl_generics.params.push(parse_quote!('a));
+    }
+
+    quote! {
+        impl #impl_generics Decode #impl_generics for #name #struct_generics #where_clause {
+            fn decode(r: &mut &'a [u8]) -> color_eyre::Result<Self>
+            where
+                Self: Sized,
+            {
+                use color_eyre::eyre::WrapErr;
+                Ok(#struct_tokens)
             }
         }
     }

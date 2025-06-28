@@ -18,7 +18,7 @@
  */
 
 use color_eyre::eyre::{ensure, Result};
-use crawlspace_macro::{Encode, Packet};
+use crawlspace_macro::{Decode, Encode, Packet};
 
 use crate::protocol::{
     datatypes::{Bounded, VarInt},
@@ -36,7 +36,7 @@ pub struct KnownPacksC<'a> {
     known_packs: Vec<KnownPack<'a>>,
 }
 
-#[derive(Debug, Encode)]
+#[derive(Debug, Encode, Decode)]
 pub struct KnownPack<'a> {
     namespace: Bounded<&'a str>,
     id: Bounded<&'a str>,
@@ -86,16 +86,6 @@ impl<'a> Decode<'a> for KnownPacksS<'a> {
     }
 }
 
-impl<'a> Decode<'a> for KnownPack<'a> {
-    fn decode(r: &mut &'a [u8]) -> Result<Self> {
-        Ok(Self {
-            namespace: Bounded::<&'a str>::decode(r)?,
-            id: Bounded::<&'a str>::decode(r)?,
-            version: Bounded::<&'a str>::decode(r)?,
-        })
-    }
-}
-
 #[derive(Debug, Packet, Encode)]
 #[packet(
     id = "minecraft:finish_configuration",
@@ -104,16 +94,10 @@ impl<'a> Decode<'a> for KnownPack<'a> {
 )]
 pub struct FinishConfigurationC;
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Decode)]
 #[packet(
     id = "minecraft:finish_configuration",
     serverbound,
     state = "PacketState::Configuration"
 )]
 pub struct FinishConfigurationAckS;
-
-impl<'a> Decode<'a> for FinishConfigurationAckS {
-    fn decode(_r: &mut &'a [u8]) -> Result<Self> {
-        Ok(Self)
-    }
-}

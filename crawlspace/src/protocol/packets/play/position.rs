@@ -18,11 +18,11 @@
  */
 
 use byteorder::{BigEndian, ReadBytesExt};
-use crawlspace_macro::Packet;
+use crawlspace_macro::{Decode, Packet};
 
 use crate::protocol::{Decode, Packet, PacketDirection, PacketState};
 
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Decode)]
 #[packet(
     id = "minecraft:move_player_pos",
     serverbound,
@@ -32,24 +32,10 @@ pub struct SetPlayerPositionS {
     pub x: f64,
     pub feet_y: f64,
     pub z: f64,
-    pub on_ground: bool,
+    pub on_ground: PosRotFlags,
 }
 
-impl Decode<'_> for SetPlayerPositionS {
-    fn decode(r: &mut &'_ [u8]) -> color_eyre::eyre::Result<Self>
-    where
-        Self: Sized,
-    {
-        Ok(Self {
-            x: r.read_f64::<BigEndian>()?,
-            feet_y: r.read_f64::<BigEndian>()?,
-            z: r.read_f64::<BigEndian>()?,
-            on_ground: r.read_u8()? == 1,
-        })
-    }
-}
-
-#[derive(Debug, Packet)]
+#[derive(Debug, Packet, Decode)]
 #[packet(
     id = "minecraft:move_player_pos_rot",
     serverbound,
@@ -61,21 +47,25 @@ pub struct SetPlayerPositionAndRotationS {
     pub z: f64,
     pub yaw: f32,
     pub pitch: f32,
-    pub on_ground: bool,
+    pub flags: PosRotFlags,
 }
 
-impl Decode<'_> for SetPlayerPositionAndRotationS {
+#[derive(Clone, Debug)]
+pub struct PosRotFlags {
+    on_ground: bool,
+    against_wall: bool,
+}
+
+impl Decode<'_> for PosRotFlags {
     fn decode(r: &mut &'_ [u8]) -> color_eyre::eyre::Result<Self>
     where
         Self: Sized,
     {
-        Ok(Self {
-            x: r.read_f64::<BigEndian>()?,
-            feet_y: r.read_f64::<BigEndian>()?,
-            z: r.read_f64::<BigEndian>()?,
-            yaw: r.read_f32::<BigEndian>()?,
-            pitch: r.read_f32::<BigEndian>()?,
-            on_ground: r.read_u8()? == 1,
+        let field = u8::decode(r)?;
+
+        Ok(PosRotFlags {
+            on_ground: field & 0b00000001 != 0,
+            against_wall: field & 0b00000010 != 0,
         })
     }
 }

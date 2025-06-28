@@ -94,7 +94,11 @@ impl Server {
             match player.handle_all_packets().await {
                 Ok(()) => (),
                 Err(why) => {
-                    error!("error handling packets for player {}: {why}", player.id());
+                    error!(
+                        "error handling packets for player {}: {:?}",
+                        player.id(),
+                        why
+                    );
                     invalid_players.insert(*id);
                     continue;
                 }

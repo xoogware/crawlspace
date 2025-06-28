@@ -296,3 +296,9 @@ impl Encode for VarLong {
         }
     }
 }
+
+impl From<VarInt> for i32 {
+    fn from(value: VarInt) -> Self {
+        value.0
+    }
+}

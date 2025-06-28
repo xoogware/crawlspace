@@ -78,7 +78,7 @@ mod decoder;
 mod encoder;
 
 use bit_vec::BitVec;
-use color_eyre::eyre::{Context, Result};
+use color_eyre::eyre::{bail, Context, Result};
 use datatypes::{Bounded, VarInt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -214,6 +214,22 @@ pub enum ProtocolState {
     Status,
     Login,
     Transfer,
+}
+
+impl Decode<'_> for ProtocolState {
+    fn decode(r: &mut &'_ [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let state = VarInt::decode(r)?;
+
+        match state.0 {
+            1 => Ok(ProtocolState::Status),
+            2 => Ok(ProtocolState::Login),
+            3 => Ok(ProtocolState::Transfer),
+            e => bail!("Invalid next state requested: {e}"),
+        }
+    }
 }
 
 #[derive(Error, Debug)]

@@ -46,9 +46,27 @@ impl Encode for bool {
     }
 }
 
+impl<'a> Decode<'a> for i8 {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(r.read_i8()?)
+    }
+}
+
 impl Encode for i8 {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         Ok(w.write_i8(*self)?)
+    }
+}
+
+impl<'a> Decode<'a> for u8 {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(r.read_u8()?)
     }
 }
 
@@ -58,9 +76,36 @@ impl Encode for u8 {
     }
 }
 
+impl<'a> Decode<'a> for i16 {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(r.read_i16::<BigEndian>()?)
+    }
+}
+
 impl Encode for i16 {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         Ok(w.write_i16::<BigEndian>(*self)?)
+    }
+}
+
+impl<'a> Decode<'a> for u16 {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(r.read_u16::<BigEndian>()?)
+    }
+}
+
+impl<'a> Decode<'a> for i32 {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(r.read_i32::<BigEndian>()?)
     }
 }
 
@@ -71,7 +116,10 @@ impl Encode for i32 {
 }
 
 impl<'a> Decode<'a> for i64 {
-    fn decode(r: &mut &'a [u8]) -> Result<Self> {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
         Ok(r.read_i64::<BigEndian>()?)
     }
 }
@@ -82,9 +130,27 @@ impl Encode for i64 {
     }
 }
 
+impl<'a> Decode<'a> for u64 {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(r.read_u64::<BigEndian>()?)
+    }
+}
+
 impl Encode for u64 {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         Ok(w.write_u64::<BigEndian>(*self)?)
+    }
+}
+
+impl<'a> Decode<'a> for u128 {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(r.read_u128::<BigEndian>()?)
     }
 }
 
@@ -94,9 +160,27 @@ impl Encode for u128 {
     }
 }
 
+impl<'a> Decode<'a> for f32 {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(r.read_f32::<BigEndian>()?)
+    }
+}
+
 impl Encode for f32 {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
         Ok(w.write_f32::<BigEndian>(*self)?)
+    }
+}
+
+impl<'a> Decode<'a> for f64 {
+    fn decode(r: &mut &'a [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(r.read_f64::<BigEndian>()?)
     }
 }
 
