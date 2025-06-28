@@ -51,7 +51,7 @@ pub struct SetPlayerPositionAndRotationS {
 }
 
 #[derive(Clone, Debug, Decode)]
-pub struct PosRotFlags(i32);
+pub struct PosRotFlags(u8);
 
 impl PosRotFlags {
     const fn is_on_ground(&self) -> bool {
