@@ -1,6 +1,6 @@
 use proc_macro::{Span, TokenStream};
 use quote::quote;
-use syn::{parse_macro_input, parse_quote, DeriveInput, Fields, Ident, Index, Lit};
+use syn::{parse_macro_input, parse_quote, DeriveInput, Fields, Ident, Index, Lit, Path};
 
 #[proc_macro_derive(Packet, attributes(packet))]
 pub fn derive_packet(input: TokenStream) -> TokenStream {
@@ -184,9 +184,9 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
 }
 
 /// Automatically implements "straight-across" decoding for the given struct, i.e. fields are
-/// deserialized in order as is. Supports #[varint] and #[varlong] attributes on integer types to
-/// deserialize as those formats instead.
-#[proc_macro_derive(Decode, attributes(varint, varlong))]
+/// deserialized in order as is. Supports #[decode_as(type)] to deserialize according to a different type.
+/// uses TryInto to convert to the expected type where necessary.
+#[proc_macro_derive(Decode, attributes(decode_as))]
 pub fn derive_decode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -206,23 +206,17 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
 
                 let wrapped = format!("for field {field_name} in {name}");
 
-                if field
+                if let Some(attr) = field
                     .attrs
                     .iter()
-                    .any(|attr| attr.meta.path().is_ident("varint"))
+                    .find(|attr| attr.meta.path().is_ident("decode_as"))
                 {
+                    let ty = attr
+                        .parse_args::<Path>()
+                        .expect("decode_as value must be a Path");
+
                     field_tokens.extend(quote! {
-                        #field_name: VarInt::decode(r)
-                            .wrap_err(#wrapped)?
-                            .try_into()?,
-                    });
-                } else if field
-                    .attrs
-                    .iter()
-                    .any(|attr| attr.meta.path().is_ident("varlong"))
-                {
-                    field_tokens.extend(quote! {
-                        #field_name: VarLong::decode(r)
+                        #field_name: <#ty as Decode>::decode(r)
                             .wrap_err(#wrapped)?
                             .try_into()?,
                     });
@@ -246,30 +240,23 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
 
                 let wrapped = format!("for field {i} in {name}");
 
-                if field
+                if let Some(attr) = field
                     .attrs
                     .iter()
-                    .any(|attr| attr.meta.path().is_ident("varint"))
+                    .find(|attr| attr.meta.path().is_ident("decode_as"))
                 {
+                    let ty = attr
+                        .parse_args::<Path>()
+                        .expect("decode_as value must be a Path");
+
                     field_tokens.extend(quote! {
-                        VarInt::decode(r)
-                            .wrap_err(#wrapped)?
-                            .try_into()?,
-                    });
-                } else if field
-                    .attrs
-                    .iter()
-                    .any(|attr| attr.meta.path().is_ident("varlong"))
-                {
-                    field_tokens.extend(quote! {
-                        VarLong::decode(r)
+                        <#ty as Decode>::decode(r)
                             .wrap_err(#wrapped)?
                             .try_into()?,
                     });
                 } else {
                     field_tokens.extend(quote! {
-                        <#ty as Decode>::decode(r)
-                            .wrap_err(#wrapped)?,
+                        <#ty as Decode>::decode(r).wrap_err(#wrapped)?,
                     });
                 }
             }

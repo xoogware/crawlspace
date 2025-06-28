@@ -138,6 +138,6 @@ impl SynchronisePositionC {
     state = "PacketState::Play"
 )]
 pub struct ConfirmTeleportS {
-    #[varint]
+    #[decode_as(VarInt)]
     pub id: i32,
 }

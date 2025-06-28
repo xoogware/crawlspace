@@ -50,22 +50,15 @@ pub struct SetPlayerPositionAndRotationS {
     pub flags: PosRotFlags,
 }
 
-#[derive(Clone, Debug)]
-pub struct PosRotFlags {
-    on_ground: bool,
-    against_wall: bool,
-}
+#[derive(Clone, Debug, Decode)]
+pub struct PosRotFlags(i32);
 
-impl Decode<'_> for PosRotFlags {
-    fn decode(r: &mut &'_ [u8]) -> color_eyre::eyre::Result<Self>
-    where
-        Self: Sized,
-    {
-        let field = u8::decode(r)?;
+impl PosRotFlags {
+    const fn is_on_ground(&self) -> bool {
+        self.0 & 0x01 == 1
+    }
 
-        Ok(PosRotFlags {
-            on_ground: field & 0b00000001 != 0,
-            against_wall: field & 0b00000010 != 0,
-        })
+    const fn is_touching_wall(&self) -> bool {
+        self.0 & 0x02 == 2
     }
 }

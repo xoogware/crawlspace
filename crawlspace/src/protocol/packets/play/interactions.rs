@@ -28,10 +28,10 @@ use crate::protocol::{
 #[derive(Debug, Packet, Decode)]
 #[packet(id = "minecraft:use_item_on", serverbound, state = "PacketState::Play")]
 pub struct UseItemOnS {
-    #[varint]
+    #[decode_as(VarInt)]
     pub hand: Hand,
     pub location: Position,
-    #[varint]
+    #[decode_as(VarInt)]
     pub face: Face,
     pub cursor_x: f32,
     pub cursor_y: f32,
