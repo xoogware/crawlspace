@@ -22,13 +22,16 @@ use std::sync::{atomic::AtomicUsize, Arc};
 use tokio::sync::{mpsc, Mutex, RwLock, Semaphore};
 use tokio_util::sync::CancellationToken;
 
+use crate::protocol::packets::login::registry::TAGS;
 use crate::{
     args::Args,
-    net::{cache::{TagCache, RegistryCache}, player::SharedPlayer},
+    net::{
+        cache::{RegistryCache, TagCache},
+        player::SharedPlayer,
+    },
     protocol::packets::login::registry::ALL_REGISTRIES,
     server::Server,
 };
-use crate::protocol::packets::login::registry::TAGS;
 
 #[derive(Debug)]
 pub struct State {

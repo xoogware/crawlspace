@@ -41,6 +41,81 @@ pub struct WorldCache {
 }
 
 impl WorldCache {
+    pub fn from_slime(state: CrawlState, world: slimeball_lib::SlimeWorld) -> Self {
+        let mut chunks = world.chunks;
+        chunks.sort_by(|a, b| {
+            if (a.x + a.z) > (b.x + b.z) {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            }
+        });
+
+        let block_states = Blocks::new();
+        let containers = chunks
+            .iter()
+            .flat_map(|c| 
+                c.tile_entities
+                    .iter()
+                    .filter_map(|e| {
+                        let block_entity = BlockEntity::try_parse(e.clone()).map_or_else(
+                            |why| {
+                                warn!(
+                                    "failed to parse block entity: {why}, ignoring in container cache for ({}, {})",
+                                    c.x,
+                                    c.z
+                                );
+                                None
+                            },
+                            |e| match e.keep_packed {
+                                true => None,
+                                false => Some(e),
+                            },
+                        );
+
+                        let block_entity = block_entity?;
+
+                        match block_entity.id.as_str() {
+                            "minecraft:chest" | "minecraft:trapped_chest" | "minecraft:barrel" => {
+                                Some(block_entity)
+                            }
+                            _ => None,
+                        }
+                    })
+                    .map(|container| {
+                        (
+                            (container.x, container.y, container.z),
+                            Container::try_from(container)
+                                .expect("Failed to convert container from block entity NBT"),
+                        )
+                    })
+                    .collect::<Vec<((i32, i32, i32), Container)>>()
+            )
+            .collect();
+
+        debug!("Containers: {:?}", containers);
+
+        let encoded = chunks
+            .par_iter()
+            .map(|chunk| {
+                let mut encoder = Encoder::new();
+                encoder
+                    .append_packet(&ChunkDataUpdateLightC::from_slime(
+                        state.clone(),
+                        chunk,
+                        &block_states,
+                    ))
+                    .expect("Failed to append packet to encoder");
+                encoder.take().to_vec()
+            })
+            .collect();
+
+        Self {
+            encoded,
+            containers,
+        }
+    }
+
     pub fn from_anvil(crawlstate: CrawlState, world: &World) -> Self {
         let mut chunks = world.0.iter().collect::<Vec<_>>();
 

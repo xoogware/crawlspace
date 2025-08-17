@@ -45,6 +45,7 @@ tokio-util = "0.7.12"
 tracing = { version = "0.1.40", features = ["max_level_trace", "release_max_level_info"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 uuid = "1.11.0"
+slimeball-lib = { git = "https://github.com/xoogware/slimeball.git" }
 
 [features]
 default = []

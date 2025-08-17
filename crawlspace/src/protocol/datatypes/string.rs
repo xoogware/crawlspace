@@ -139,7 +139,7 @@ impl<'a, const BOUND: usize> Encode for Rest<&'a str, BOUND> {
 
 impl<'a, const BOUND: usize> Encode for Rest<Bytes<'a>, BOUND> {
     fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
-        let len = self.0.0.len();
+        let len = self.0 .0.len();
 
         ensure!(len <= BOUND, "length of bytes {len} exceeds bound {BOUND}");
 

@@ -45,7 +45,7 @@ struct Effects {
     mood_sound: Option<MoodSound>,
     additions_sound: Option<AdditionsSound>,
     music: Option<Vec<Music>>,
-    music_volume: Option<f32>
+    music_volume: Option<f32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

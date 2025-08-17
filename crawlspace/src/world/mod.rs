@@ -17,7 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::HashMap, fs::File, path::Path};
+use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 
 use color_eyre::eyre::Result;
 use fastanvil::Region;
@@ -115,44 +115,49 @@ pub struct Biomes {
     pub _data: Option<fastnbt::LongArray>,
 }
 
-pub fn read_world(path: &str) -> Result<World> {
-    let folder = Path::new(path).join("region");
-    let folder = std::fs::read_dir(folder).unwrap();
-    let chunks = std::sync::Mutex::new(HashMap::new());
-
-    folder.into_iter().par_bridge().for_each(|path| {
-        let file = File::open(path.unwrap().path()).expect("Failed to open file");
-        let mut region = Region::from_stream(file).expect("Failed to create region from stream");
-
-        region.iter().par_bridge().for_each(|chunk| {
-            let chunk = chunk.unwrap();
-            let mut parsed: Chunk = fastnbt::from_bytes(&chunk.data).unwrap_or_else(|e| {
-                panic!(
-                    "Failed to parse chunk {e}: {}",
-                    &chunk
-                        .data
-                        .iter()
-                        .map(|b| b.to_string())
-                        .collect::<Vec<String>>()
-                        .join(" ")
-                );
-            });
-
-            if (-10..10).contains(&parsed.x_pos) && (-10..10).contains(&parsed.z_pos) {
-                parsed.sections.sort_by_key(|c| c.y);
-
-                debug!(
-                    "Successfully parsed chunk at {}, {}",
-                    parsed.x_pos, parsed.z_pos
-                );
-                trace!("{:?}", parsed);
-
-                let mut chunks = chunks.lock().expect("Failed to lock chunk mutex");
-                chunks.insert((parsed.x_pos, parsed.z_pos), parsed);
-            }
-        });
-    });
-
-    let chunks = chunks.lock().expect("Failed to lock chunk mutex");
-    Ok(World(chunks.clone()))
+pub fn read_world(path: &str) -> Result<slimeball_lib::SlimeWorld> {
+    let world = File::open(path)?;
+    let mut reader = BufReader::new(world);
+    Ok(slimeball_lib::SlimeWorld::deserialize(&mut reader)?)
 }
+// pub fn read_world(path: &str) -> Result<World> {
+//     let folder = Path::new(path).join("region");
+//     let folder = std::fs::read_dir(folder).unwrap();
+//     let chunks = std::sync::Mutex::new(HashMap::new());
+
+//     folder.into_iter().par_bridge().for_each(|path| {
+//         let file = File::open(path.unwrap().path()).expect("Failed to open file");
+//         let mut region = Region::from_stream(file).expect("Failed to create region from stream");
+
+//         region.iter().par_bridge().for_each(|chunk| {
+//             let chunk = chunk.unwrap();
+//             let mut parsed: Chunk = fastnbt::from_bytes(&chunk.data).unwrap_or_else(|e| {
+//                 panic!(
+//                     "Failed to parse chunk {e}: {}",
+//                     &chunk
+//                         .data
+//                         .iter()
+//                         .map(|b| b.to_string())
+//                         .collect::<Vec<String>>()
+//                         .join(" ")
+//                 );
+//             });
+
+//             if (-10..10).contains(&parsed.x_pos) && (-10..10).contains(&parsed.z_pos) {
+//                 parsed.sections.sort_by_key(|c| c.y);
+
+//                 debug!(
+//                     "Successfully parsed chunk at {}, {}",
+//                     parsed.x_pos, parsed.z_pos
+//                 );
+//                 trace!("{:?}", parsed);
+
+//                 let mut chunks = chunks.lock().expect("Failed to lock chunk mutex");
+//                 chunks.insert((parsed.x_pos, parsed.z_pos), parsed);
+//             }
+//         });
+//     });
+
+//     let chunks = chunks.lock().expect("Failed to lock chunk mutex");
+//     Ok(World(chunks.clone()))
+// }

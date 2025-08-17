@@ -16,5 +16,5 @@
 # <https://www.gnu.org/licenses/>.
 
 [toolchain]
-channel = "1.82.0"
+channel = "1.88.0"
 components = [ "rustfmt", "clippy" ]

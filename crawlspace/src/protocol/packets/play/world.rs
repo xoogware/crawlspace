@@ -367,6 +367,140 @@ impl ChunkSection {
             },
         }
     }
+
+    pub fn slime_to_sec(
+        crawlstate: CrawlState,
+        value: &slimeball_lib::Section,
+        block_states: &Blocks,
+    ) -> Self {
+        let mut blocks = Vec::new();
+        let bit_length = (64 - (value.block_states.palette.len() as u64).leading_zeros()).max(4);
+
+        let blocks_per_long = 64 / bit_length;
+
+        #[cfg(not(feature = "modern_art"))]
+        let bit_mask = (1 << bit_length) - 1;
+
+        match value.block_states.data {
+            None => blocks.fill(0),
+            Some(ref data) => {
+                trace!("data.len(): {}", data.len());
+                trace!("blocks_per_long: {blocks_per_long}");
+                blocks.resize(data.len() * blocks_per_long as usize, 0);
+                let mut i = 0;
+                for long in data.iter() {
+                    #[cfg(not(feature = "modern_art"))]
+                    {
+                        let long = *long as u64;
+                        for b in 0..blocks_per_long {
+                            blocks[i] = ((long >> (bit_length * b)) & bit_mask) as i16;
+                            i += 1;
+                        }
+                    }
+
+                    #[cfg(feature = "modern_art")]
+                    {
+                        let mut long = *long as u64;
+                        while long != 0 {
+                            blocks[i] = (long & ((1 << bit_length) - 1)) as i16;
+                            long >>= bit_length;
+                            i += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        let palette = value
+            .block_states
+            .palette
+            .iter()
+            .map(|b| BlockState::parse_state_slime(b, block_states).unwrap_or(BlockState::AIR))
+            .collect::<Vec<_>>();
+
+        let blocks: Vec<u16> = blocks
+            .iter()
+            // todo: come up with a better way to do this(?)
+            .map(|b| palette.get(*b as usize).unwrap_or(&BlockState::AIR).0)
+            .collect();
+
+        let block_count = blocks.iter().filter(|b| **b != 0).collect::<Vec<_>>().len();
+
+        let bit_length = match palette.len() {
+            1 => 0,
+            l => (64 - l.leading_zeros()).max(4) as u8,
+        };
+
+        trace!("bit_length: {bit_length}");
+
+        let palette = {
+            if bit_length == 15 {
+                Palette::Direct
+            } else if bit_length >= 4 {
+                Palette::Indirect(VarInt(palette.len() as i32), palette)
+            } else {
+                Palette::SingleValued(*palette.first().unwrap())
+            }
+        };
+
+        let blocks = match palette {
+            Palette::Indirect(_, ref p) => blocks
+                .iter()
+                .map(|requested| p.iter().position(|pb| pb.0 == *requested).unwrap() as u16)
+                .collect::<Vec<_>>(),
+            _ => blocks,
+        };
+
+        trace!("palette: {:?}", palette);
+        trace!("blocks: {:?}", blocks);
+
+        let data = {
+            let data = match palette {
+                Palette::Direct | Palette::Indirect(..) => {
+                    let blocks_per_long = 64 / bit_length;
+                    let mut data = vec![0i64; blocks.len() / blocks_per_long as usize];
+                    let mut blocks_so_far = 0;
+                    let mut long_index = 0;
+
+                    for block in blocks {
+                        if blocks_so_far == blocks_per_long {
+                            blocks_so_far = 0;
+                            long_index += 1;
+                        }
+
+                        let block = block as i64;
+
+                        data[long_index] |= block << (blocks_so_far * bit_length);
+                        blocks_so_far += 1;
+                        trace!("block: {} ({:b}), long (after appending): {:b}, blocks so far: {blocks_so_far}", block, block, data[long_index])
+                    }
+
+                    data
+                }
+                Palette::SingleValued(_) => Vec::with_capacity(0),
+            };
+
+            let data = fastnbt::LongArray::new(data.to_vec());
+            trace!("data: {:?}", data);
+            data
+        };
+
+        Self {
+            block_count: block_count as i16,
+            block_states: PalettedContainer {
+                bits_per_entry: bit_length,
+                palette,
+                data_array: data,
+            },
+            biomes: PalettedContainer {
+                bits_per_entry: 0,
+                palette: Palette::SingleValued(BlockState(
+                    crawlstate.registry_cache.the_end_biome_id,
+                )),
+                data_array: fastnbt::LongArray::new(vec![]),
+            },
+        }
+    }
 }
 
 impl ChunkDataUpdateLightC<'_> {
@@ -403,6 +537,55 @@ impl ChunkDataUpdateLightC<'_> {
         Self {
             x: value.x_pos,
             z: value.z_pos,
+            heightmaps: HeightMaps(HashMap::new()),
+            data,
+            entities: block_entities,
+            sky_light_mask: BitVec::from_elem(18, false),
+            block_light_mask: BitVec::from_elem(18, false),
+            empty_sky_light_mask: BitVec::from_elem(18, true),
+            empty_block_light_mask: BitVec::from_elem(18, true),
+            sky_light_arrays: vec![],
+            block_light_arrays: vec![],
+        }
+    }
+
+    pub fn from_slime(
+        crawlstate: CrawlState,
+        value: &slimeball_lib::Chunk,
+        block_states: &Blocks,
+    ) -> Self {
+        let data = value
+            .sections
+            .iter()
+            .map(|sec| ChunkSection::slime_to_sec(crawlstate.clone(), sec, block_states))
+            .collect::<Vec<_>>();
+
+        let block_entities = value
+            .tile_entities
+            .clone()
+            .into_iter()
+            .filter_map(|e| {
+                world::BlockEntity::try_parse(e).map_or_else(
+                    |why| {
+                        warn!(
+                            "Failed to parse block entity: {why}, ignoring in final chunk packet for ({}, {})",
+                            value.x,
+                            value.z,
+                        );
+                        None
+                    },
+                    |e| match e.keep_packed {
+                        true => None,
+                        false => Some(e),
+                    },
+                )
+            })
+            .map(Into::into)
+            .collect::<Vec<self::BlockEntity>>();
+
+        Self {
+            x: value.x,
+            z: value.z,
             heightmaps: HeightMaps(HashMap::new()),
             data,
             entities: block_entities,

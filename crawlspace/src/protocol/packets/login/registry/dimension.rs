@@ -19,7 +19,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{RegistryItem, deserialize_bool};
+use super::{deserialize_bool, RegistryItem};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DimensionType {

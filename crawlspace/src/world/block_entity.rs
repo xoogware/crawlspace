@@ -67,7 +67,7 @@ impl BlockEntity {
 
         Ok(Self {
             id,
-            keep_packed: get_tag!(data, Value::Byte, "keepPacked") == 1,
+            keep_packed: data.get("keepPacked").map_or(false, |k| k == 1),
             x: get_tag!(data, Value::Int, "x"),
             y: get_tag!(data, Value::Int, "y"),
             z: get_tag!(data, Value::Int, "z"),

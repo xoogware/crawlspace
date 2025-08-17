@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
     let state = Arc::new(state::State::new(VERSION, VERSION_NUM, args));
 
     info!("Generating world chunk packets");
-    let world_cache = WorldCache::from_anvil(state.clone(), &world);
+    let world_cache = WorldCache::from_slime(state.clone(), world);
     info!("Done.");
 
     #[cfg(feature = "lan")]

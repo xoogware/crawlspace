@@ -50,6 +50,19 @@ impl BlockState {
                 .map(|b| Self(b.id))
         })
     }
+
+    pub fn parse_state_slime(
+        value: &slimeball_lib::BlockState,
+        block_states: &Blocks,
+    ) -> Option<Self> {
+        // TODO: build map lazily to speed up load time?
+        block_states.0.get(&value.name).and_then(|b| {
+            b.states
+                .iter()
+                .find(|s| value.properties == s.properties)
+                .map(|b| Self(b.id))
+        })
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
