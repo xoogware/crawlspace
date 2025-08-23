@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "crawlspace-macro","crawlspace", "crawlspace-slime"]
+members = [ "crawlspace-macro","crawlspace" , "crawlspace-proto", "crawlspace-proto-1_8"]
 
 [profile.release-stripped]
 inherits = "release"

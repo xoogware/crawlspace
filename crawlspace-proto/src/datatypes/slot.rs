@@ -17,7 +17,8 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use crate::{protocol::Encode, server::registries::REGISTRIES, world::Item};
+// use crate::{protocol::Encode, server::registries::REGISTRIES, world::Item};
+use crate::{ErrorKind, Write};
 
 use super::VarInt;
 
@@ -32,19 +33,10 @@ pub struct Slot {
 #[derive(Debug, Clone)]
 pub enum Component {}
 
-impl From<Item> for Slot {
-    fn from(value: Item) -> Self {
-        let item_id = REGISTRIES
-            .item
-            .entries
-            .get(&value.id)
-            .expect("Couldn't find registry entry for item")
-            .protocol_id;
-
-        debug!("item id for {}: {item_id}", value.id);
-
+impl Slot {
+    pub fn new(item_id: i32, item_count: i8) -> Self {
         Self {
-            item_count: value.count as i8,
+            item_count,
             item_id: Some(item_id),
             components_to_add: None,
             components_to_remove: None,
@@ -52,16 +44,16 @@ impl From<Item> for Slot {
     }
 }
 
-impl Encode for Slot {
-    fn encode(&self, mut w: impl std::io::Write) -> color_eyre::eyre::Result<()> {
-        self.item_count.encode(&mut w)?;
+impl Write for Slot {
+    fn write(&self, w: &mut impl std::io::Write) -> Result<(), ErrorKind> {
+        self.item_count.write(w)?;
 
         if self.item_count == 0 {
             return Ok(());
         }
 
         if let Some(item_id) = self.item_id {
-            VarInt(item_id).encode(&mut w)?;
+            VarInt(item_id).write(w)?;
 
             VarInt(
                 self.components_to_add
@@ -69,7 +61,7 @@ impl Encode for Slot {
                     .map(|v| v.len())
                     .unwrap_or(0) as i32,
             )
-            .encode(&mut w)?;
+            .write(w)?;
 
             VarInt(
                 self.components_to_remove
@@ -77,7 +69,7 @@ impl Encode for Slot {
                     .map(|v| v.len())
                     .unwrap_or(0) as i32,
             )
-            .encode(&mut w)?;
+            .write(w)?;
 
             if let Some(ref components_to_add) = self.components_to_add {
                 for _component in components_to_add {

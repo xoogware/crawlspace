@@ -18,23 +18,16 @@
  */
 
 use std::fmt::Display;
-use std::io::Write;
 
 use byteorder::ReadBytesExt;
-use color_eyre::eyre::Result;
 use serde::Deserialize;
 
-use crate::protocol::{Decode, Encode};
+use crate::{
+    ErrorKind::{self, InvalidData},
+    Read, Write,
+};
 
-#[derive(thiserror::Error, Debug)]
-pub enum VariableDecodeError {
-    #[error("VarNum exceeds 32 bits")]
-    TooLong,
-    #[error("VarNum incomplete")]
-    Incomplete,
-}
-
-pub trait VariableNumber<'a>: Sized + Encode + Decode<'a> {
+pub trait VariableNumber: Sized + Write + for<'a> Read<'a> {
     const SEGMENT_BITS: u8 = 0b01111111;
     const CONTINUE_BITS: u8 = 0b10000000;
 
@@ -49,7 +42,7 @@ macro_rules! make_var_num {
         #[serde(transparent)]
         pub struct $name(pub $type);
 
-        impl VariableNumber<'_> for $name {
+        impl VariableNumber for $name {
             const MAX_BYTES: usize = $max_bytes;
 
             fn len(self) -> usize {
@@ -66,23 +59,21 @@ macro_rules! make_var_num {
             }
         }
 
-        impl Decode<'_> for $name {
-            fn decode(r: &mut &[u8]) -> Result<Self> {
+        impl Read<'_> for $name {
+            fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind> {
                 let mut v: $type = 0;
 
                 for i in 0..Self::MAX_BYTES {
-                    let byte = r.read_u8().map_err(|_| VariableDecodeError::Incomplete)?;
+                    let byte = r
+                        .read_u8()
+                        .map_err(|_| InvalidData("Incomplete variable number".to_string()))?;
                     v |= <$type>::from(byte & Self::SEGMENT_BITS) << (i * 7);
                     if byte & Self::CONTINUE_BITS == 0 {
                         return Ok(Self(v));
                     }
                 }
 
-                if r.len() > 0 {
-                    Err(VariableDecodeError::TooLong)?;
-                }
-
-                Err(VariableDecodeError::Incomplete)?
+                Err(InvalidData("Malformed variable number".to_string()))
             }
         }
     };
@@ -91,10 +82,10 @@ macro_rules! make_var_num {
 make_var_num!(VarInt, i32, 5);
 make_var_num!(VarLong, i64, 10);
 
-impl Encode for VarInt {
+impl Write for VarInt {
     // implementation taken from https://github.com/as-com/varint-simd/blob/0f468783da8e181929b01b9c6e9f741c1fe09825/src/encode/mod.rs#L71
     // only the first branch is done here because we never need to change varint size
-    fn encode(&self, mut w: impl Write) -> Result<()> {
+    fn write(&self, w: &mut impl std::io::Write) -> Result<(), ErrorKind> {
         let x = self.0 as u64;
         let stage1 = (x & 0x000000000000007f)
             | ((x & 0x0000000000003f80) << 1)
@@ -243,10 +234,10 @@ impl VarLong {
     // }
 }
 
-impl Encode for VarLong {
+impl Write for VarLong {
     // ...and here's the second branch ^_^
     #[cfg(any(target_feature = "bmi2", target_feature = "avx2"))]
-    fn encode(&self, mut w: impl Write) -> Result<()> {
+    fn write(&self, w: &mut impl std::io::Write) -> Result<(), ErrorKind> {
         use std::arch::x86_64::*;
         unsafe {
             // Break the number into 7-bit parts and spread them out into a vector
@@ -282,7 +273,7 @@ impl Encode for VarLong {
     // TODO: implement this using neon? not likely we'll use arm-based servers but maybe nice for
     // local testing?
     #[cfg(not(any(target_feature = "bmi2", target_feature = "avx2")))]
-    fn encode(&self, mut w: impl Write) -> Result<()> {
+    fn write(&self, w: &mut impl std::io::Write) -> Result<(), ErrorKind> {
         use byteorder::WriteBytesExt;
 
         let mut val = self.0 as u64;

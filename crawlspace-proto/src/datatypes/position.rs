@@ -19,10 +19,9 @@
 
 use bitfield_struct::bitfield;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use color_eyre::eyre::Result;
 use thiserror::Error;
 
-use crate::protocol::{Decode, Encode};
+use crate::{ErrorKind, Read, Write};
 
 #[derive(Debug)]
 pub struct Position {
@@ -80,18 +79,17 @@ impl From<PackedPosition> for Position {
     }
 }
 
-impl Encode for Position {
-    fn encode(&self, w: impl std::io::Write) -> Result<()> {
-        let encoded: PackedPosition = self.try_into()?;
-        encoded.encode(w)
+impl Write for Position {
+    fn write(&self, w: &mut impl std::io::Write) -> Result<(), ErrorKind> {
+        let encoded: PackedPosition = self
+            .try_into()
+            .map_err(|_| ErrorKind::InvalidData("Invalid packed position".to_string()))?;
+        encoded.write(w)
     }
 }
 
-impl Decode<'_> for Position {
-    fn decode(r: &mut &'_ [u8]) -> Result<Self>
-    where
-        Self: Sized,
-    {
+impl Read<'_> for Position {
+    fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind> {
         let bytes = r.read_i64::<BigEndian>()?;
 
         Ok(Self {
@@ -102,8 +100,8 @@ impl Decode<'_> for Position {
     }
 }
 
-impl Encode for PackedPosition {
-    fn encode(&self, mut w: impl std::io::Write) -> Result<()> {
+impl Write for PackedPosition {
+    fn write(&self, w: &mut impl std::io::Write) -> Result<(), ErrorKind> {
         Ok(w.write_u64::<BigEndian>(self.0)?)
     }
 }

@@ -17,22 +17,6 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-pub mod datatypes {
-    mod impls;
-    mod position;
-    mod slot;
-    mod string;
-    mod text_component;
-    mod variable;
-
-    pub use impls::*;
-    pub use position::*;
-    pub use slot::*;
-    pub use string::*;
-    pub use text_component::*;
-    pub use variable::*;
-}
-
 pub mod packets {
     pub mod login {
         mod config;
