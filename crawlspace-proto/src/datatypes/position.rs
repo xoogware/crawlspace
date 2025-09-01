@@ -88,7 +88,7 @@ impl Write for Position {
     }
 }
 
-impl Read<'_> for Position {
+impl Read for Position {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind> {
         let bytes = r.read_i64::<BigEndian>()?;
 

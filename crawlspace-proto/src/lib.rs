@@ -34,7 +34,8 @@ pub mod datatypes {
     pub use variable::*;
 }
 
-pub enum PacketState {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ConnectionState {
     Handshake,
     Play,
     Status,
@@ -43,29 +44,66 @@ pub enum PacketState {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ErrorKind {
+    #[error("Not connected to a client")]
+    Disconnected,
     #[error("IO error")]
     Io(#[from] std::io::Error),
     #[error("Invalid data: {0}")]
     InvalidData(String),
+    #[error("Timed out")]
+    Timeout,
 }
 
-pub trait Read<'a> {
-    fn read(reader: &mut impl std::io::Read) -> Result<Self, ErrorKind>
+pub type Result<T> = std::result::Result<T, ErrorKind>;
+
+pub trait Read {
+    fn read(reader: &mut impl std::io::Read) -> Result<Self>
     where
         Self: Sized;
 }
 
 pub trait Write {
-    fn write(&self, writer: &mut impl std::io::Write) -> Result<(), ErrorKind>;
+    fn write(&self, writer: &mut impl std::io::Write) -> Result<()>;
+}
+
+#[derive(Clone, Debug)]
+pub enum PacketId {
+    String(&'static str),
+    Numeric(i32),
+}
+
+impl PartialEq<i32> for PacketId {
+    fn eq(&self, other: &i32) -> bool {
+        match self {
+            Self::Numeric(i) => i == other,
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq<&'static str> for PacketId {
+    fn eq(&self, other: &&'static str) -> bool {
+        match self {
+            Self::String(s) => s == other,
+            _ => false,
+        }
+    }
 }
 
 pub trait Packet {
-    fn packet_id(&self) -> &'static str;
-    fn packet_state(&self) -> PacketState;
+    fn packet_id() -> PacketId
+    where
+        Self: Sized;
+    fn packet_state() -> ConnectionState
+    where
+        Self: Sized;
 }
 
-pub trait ServerboundPacket: Packet + for<'a> Read<'a> {}
+pub trait ServerboundPacket: Packet + Read {}
+impl<T> ServerboundPacket for T where T: Packet + Read {}
+
 pub trait ClientboundPacket: Packet + Write {}
+impl<T> ClientboundPacket for T where T: Packet + Write {}
 
 pub trait Protocol {
     fn handshake_player(&mut self);

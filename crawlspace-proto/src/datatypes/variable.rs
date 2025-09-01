@@ -27,7 +27,7 @@ use crate::{
     Read, Write,
 };
 
-pub trait VariableNumber: Sized + Write + for<'a> Read<'a> {
+pub trait VariableNumber: Sized + Write + Read {
     const SEGMENT_BITS: u8 = 0b01111111;
     const CONTINUE_BITS: u8 = 0b10000000;
 
@@ -59,7 +59,7 @@ macro_rules! make_var_num {
             }
         }
 
-        impl Read<'_> for $name {
+        impl Read for $name {
             fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind> {
                 let mut v: $type = 0;
 

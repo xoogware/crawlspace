@@ -27,7 +27,7 @@ use super::VarInt;
 #[derive(Debug)]
 pub struct Bounded<T, const BOUND: usize = 32767>(pub T);
 
-impl<const BOUND: usize> Read<'_> for Bounded<String, BOUND> {
+impl<const BOUND: usize> Read for Bounded<String, BOUND> {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind> {
         let len = VarInt::read(r)?.0;
         if len < 0 {
@@ -79,7 +79,7 @@ impl Write for str {
 #[derive(Debug)]
 pub struct Rest<T, const BOUND: usize = 32767>(pub T);
 
-impl<'a, const BOUND: usize> Read<'_> for Rest<String, BOUND> {
+impl<'a, const BOUND: usize> Read for Rest<String, BOUND> {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind> {
         let mut buf = Vec::new();
         r.read_to_end(&mut buf)?;

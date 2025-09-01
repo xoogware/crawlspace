@@ -17,7 +17,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-use proc_macro::{Span, TokenStream};
+use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, parse_quote, DeriveInput, Fields, Ident, Index, Lit, Path};
 
@@ -41,10 +41,9 @@ pub fn derive_packet(input: TokenStream) -> TokenStream {
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("id") {
                 let lit = meta.value()?.parse()?;
-                match lit {
-                    Lit::Str(i) => {
-                        id = Some(i);
-                    }
+                id = match lit {
+                    Lit::Str(i) => Some(quote!(crawlspace_proto::PacketId::String(#i))),
+                    Lit::Int(i) => Some(quote!(crawlspace_proto::PacketId::Numeric(#i))),
                     _ => panic!("attribute value `id` must be a string"),
                 }
             } else if meta.path.is_ident("state") {
@@ -88,27 +87,19 @@ pub fn derive_packet(input: TokenStream) -> TokenStream {
 
     let id = id.expect("id must be provided for packet");
     let state = state.expect("state must be provided for packet");
-    let direction = Ident::new(
-        direction.expect("direction must be provided for packet"),
-        Span::call_site().into(),
-    );
 
     let name = input.ident;
     let where_clause = input.generics.where_clause.clone();
     let generics = input.generics;
 
     quote! {
-    impl #generics Packet for #name #generics #where_clause {
-        fn id() -> &'static str {
+    impl #generics crawlspace_proto::Packet for #name #generics #where_clause {
+        fn packet_id() -> crawlspace_proto::PacketId {
             #id
         }
 
-        fn state() -> PacketState {
+        fn packet_state() -> crawlspace_proto::ConnectionState {
             #state
-        }
-
-        fn direction() -> PacketDirection {
-            PacketDirection::#direction
         }
     }
     }
@@ -118,12 +109,12 @@ pub fn derive_packet(input: TokenStream) -> TokenStream {
 /// Automatically implements "straight-across" encoding for the given struct, i.e. fields are
 /// serialized in order as is. Supports #[varint] and #[varlong] attributes on integer types to
 /// serialize as those formats instead.
-#[proc_macro_derive(Encode, attributes(varint, varlong))]
-pub fn derive_encode(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Write, attributes(varint, varlong))]
+pub fn derive_write(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let syn::Data::Struct(data) = input.data else {
-        panic!("Can only derive Encode on a struct");
+        panic!("Can only derive Write on a struct");
     };
 
     let name = input.ident;
@@ -143,7 +134,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
                     .any(|attr| attr.meta.path().is_ident("varint"))
                 {
                     fields_encoded.extend(quote! {
-                        VarInt(self.#field_name as i32).encode(&mut w)?;
+                        VarInt(self.#field_name as i32).write(w)?;
                     });
                 } else if field
                     .attrs
@@ -151,11 +142,11 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
                     .any(|attr| attr.meta.path().is_ident("varlong"))
                 {
                     fields_encoded.extend(quote! {
-                        VarLong(self.#field_name as i64).encode(&mut w)?;
+                        VarLong(self.#field_name as i64).write(w)?;
                     });
                 } else {
                     fields_encoded.extend(quote! {
-                        self.#field_name.encode(&mut w)?;
+                        self.#field_name.write(w)?;
                     });
                 }
             }
@@ -170,7 +161,7 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
                     .any(|attr| attr.meta.path().is_ident("varint"))
                 {
                     fields_encoded.extend(quote! {
-                        VarInt(self.#i as i32).encode(&mut w)?;
+                        VarInt(self.#i as i32).write(w)?;
                     });
                 } else if field
                     .attrs
@@ -178,11 +169,11 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
                     .any(|attr| attr.meta.path().is_ident("varlong"))
                 {
                     fields_encoded.extend(quote! {
-                        VarLong(self.#i as i64).encode(&mut w)?;
+                        VarLong(self.#i as i64).write(w)?;
                     });
                 } else {
                     fields_encoded.extend(quote! {
-                        self.#i.encode(&mut w)?;
+                        self.#i.write(w)?;
                     });
                 }
             }
@@ -191,8 +182,8 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
     }
 
     quote! {
-        impl #generics Encode for #name #generics #where_clause {
-            fn encode(&self, mut w: impl std::io::Write) -> color_eyre::Result<()> {
+        impl #generics Write for #name #generics #where_clause {
+            fn encode(&self, w: &mut impl std::io::Write) -> crawlspace_proto::Result<()> {
                 #fields_encoded
 
                 Ok(())
@@ -205,12 +196,12 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
 /// Automatically implements "straight-across" decoding for the given struct, i.e. fields are
 /// deserialized in order as is. Supports #[decode_as(type)] to deserialize according to a different type.
 /// uses TryInto to convert to the expected type where necessary.
-#[proc_macro_derive(Decode, attributes(decode_as))]
-pub fn derive_decode(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Read, attributes(decode_as))]
+pub fn derive_read(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let syn::Data::Struct(data) = input.data else {
-        panic!("Can only derive Decode on a struct");
+        panic!("Can only derive Read on a struct");
     };
 
     let name = input.ident;
@@ -223,8 +214,6 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
                 let field_name = field.ident.expect("couldn't get ident for named field");
                 let ty = field.ty;
 
-                let wrapped = format!("for field {field_name} in {name}");
-
                 if let Some(attr) = field
                     .attrs
                     .iter()
@@ -235,14 +224,11 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
                         .expect("decode_as value must be a Path");
 
                     field_tokens.extend(quote! {
-                        #field_name: <#ty as Decode>::decode(r)
-                            .wrap_err(#wrapped)?
-                            .try_into()?,
+                        #field_name: <#ty as Read>::read(r)?.try_into()?,
                     });
                 } else {
                     field_tokens.extend(quote! {
-                        #field_name: <#ty as Decode>::decode(r)
-                            .wrap_err(#wrapped)?,
+                        #field_name: <#ty as Read>::read(r)?,
                     });
                 }
             }
@@ -254,10 +240,8 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
         }
         Fields::Unnamed(fields) => {
             let mut field_tokens = proc_macro2::TokenStream::new();
-            for (i, field) in fields.unnamed.into_iter().enumerate() {
+            for field in fields.unnamed.into_iter() {
                 let ty = field.ty;
-
-                let wrapped = format!("for field {i} in {name}");
 
                 if let Some(attr) = field
                     .attrs
@@ -269,13 +253,12 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
                         .expect("decode_as value must be a Path");
 
                     field_tokens.extend(quote! {
-                        <#ty as Decode>::decode(r)
-                            .wrap_err(#wrapped)?
+                        <#ty as Read>::read(r)?
                             .try_into()?,
                     });
                 } else {
                     field_tokens.extend(quote! {
-                        <#ty as Decode>::decode(r).wrap_err(#wrapped)?,
+                        <#ty as Read>::read(r)?,
                     });
                 }
             }
@@ -289,18 +272,12 @@ pub fn derive_decode(input: TokenStream) -> TokenStream {
     let struct_generics = input.generics;
     let where_clause = struct_generics.where_clause.clone();
 
-    let mut impl_generics = struct_generics.clone();
-    if impl_generics.lifetimes().count() == 0 {
-        impl_generics.params.push(parse_quote!('a));
-    }
-
     quote! {
-        impl #impl_generics Decode #impl_generics for #name #struct_generics #where_clause {
-            fn decode(r: &mut &'a [u8]) -> color_eyre::Result<Self>
+        impl #struct_generics crawlspace_proto::Read for #name #struct_generics #where_clause {
+            fn read(r: &mut impl std::io::Read) -> crawlspace_proto::Result<Self>
             where
                 Self: Sized,
             {
-                use color_eyre::eyre::WrapErr;
                 Ok(#struct_tokens)
             }
         }

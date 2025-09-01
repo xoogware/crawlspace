@@ -25,7 +25,7 @@ use crate::{
     Read, Write,
 };
 
-impl Read<'_> for bool {
+impl Read for bool {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind> {
         Ok(match r.read_u8()? {
             0x01 => true,
@@ -50,7 +50,7 @@ impl Write for bool {
     }
 }
 
-impl Read<'_> for i8 {
+impl Read for i8 {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind> {
         Ok(r.read_i8()?)
     }
@@ -62,7 +62,7 @@ impl Write for i8 {
     }
 }
 
-impl Read<'_> for u8 {
+impl Read for u8 {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind>
     where
         Self: Sized,
@@ -77,7 +77,7 @@ impl Write for u8 {
     }
 }
 
-impl Read<'_> for i16 {
+impl Read for i16 {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind>
     where
         Self: Sized,
@@ -92,7 +92,7 @@ impl Write for i16 {
     }
 }
 
-impl Read<'_> for u16 {
+impl Read for u16 {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind>
     where
         Self: Sized,
@@ -101,7 +101,7 @@ impl Read<'_> for u16 {
     }
 }
 
-impl Read<'_> for i32 {
+impl Read for i32 {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind>
     where
         Self: Sized,
@@ -116,7 +116,7 @@ impl Write for i32 {
     }
 }
 
-impl Read<'_> for i64 {
+impl Read for i64 {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind>
     where
         Self: Sized,
@@ -131,7 +131,7 @@ impl Write for i64 {
     }
 }
 
-impl Read<'_> for u64 {
+impl Read for u64 {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind>
     where
         Self: Sized,
@@ -146,7 +146,7 @@ impl Write for u64 {
     }
 }
 
-impl Read<'_> for u128 {
+impl Read for u128 {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind>
     where
         Self: Sized,
@@ -161,7 +161,7 @@ impl Write for u128 {
     }
 }
 
-impl Read<'_> for f32 {
+impl Read for f32 {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind>
     where
         Self: Sized,
@@ -176,7 +176,7 @@ impl Write for f32 {
     }
 }
 
-impl Read<'_> for f64 {
+impl Read for f64 {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind>
     where
         Self: Sized,
@@ -197,7 +197,7 @@ impl Write for Uuid {
     }
 }
 
-impl Read<'_> for Uuid {
+impl Read for Uuid {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind> {
         Ok(Uuid::from_u128(r.read_u128::<BigEndian>()?))
     }
@@ -228,9 +228,9 @@ where
     }
 }
 
-impl<'a, T> Read<'a> for Vec<T>
+impl<T> Read for Vec<T>
 where
-    T: Read<'a>,
+    T: Read,
 {
     fn read(r: &mut impl std::io::Read) -> Result<Self, ErrorKind> {
         let times = r.read_i32::<BigEndian>()?;

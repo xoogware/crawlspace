@@ -365,7 +365,10 @@ name = "crawlspace-proto-1_8"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "crawlspace-macro",
  "crawlspace-proto",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
